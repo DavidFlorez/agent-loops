@@ -1,0 +1,20 @@
+# Virtual environments & Python caches
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+
+# Raw downloaded datasets (cached locally, never committed)
+data/
+raw_data/
+*.parquet
+*.jsonl
+*.jsonl.gz
+.hf_cache/
+
+# OS / editor noise
+.DS_Store
+.vscode/
+.idea/

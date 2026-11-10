@@ -1,0 +1,176 @@
+{
+  "pre_registered_rebuild_ratio_bounds": [
+    0.5,
+    2.0
+  ],
+  "terminalbench": {
+    "runs_analyzed": 34462,
+    "loop_runs": 10684,
+    "loop_run_rate": 0.3100226336254425,
+    "total_steps": 1075547,
+    "loop_steps": 79344,
+    "loop_step_share": 0.07377083474734251,
+    "productive_repeat_step_share": 0.055385771147146524,
+    "cost_eval_runs": 5011,
+    "total_cost_usd": 3330.947953098463,
+    "loop_cost_usd": 589.7617597162433,
+    "loop_dollar_share": 0.17705523112951801,
+    "overall_pass_rate": 0.3214845336892809,
+    "looping_pass_rate": 0.2742418569824036,
+    "loop_free_pass_rate": 0.3427117503574733,
+    "exact_loop_runs": 8225,
+    "near_duplicate_runs": 3421,
+    "aba_thrash_runs": 2578,
+    "rotation_runs": 334,
+    "rotation_missed_by_cline": 277,
+    "rotation_missed_by_cline_pct": 0.8293413173652695,
+    "error_streak_runs": 2645,
+    "redundant_reread_runs": 582,
+    "productive_repeat_runs": 15292,
+    "drop_audit": {
+      "total_rows": 52104,
+      "dropped_null_or_empty_steps": 17642,
+      "rows_with_steps": 34462,
+      "cost_dropped_rebuild_mismatch": 24543,
+      "cost_dropped_missing_reported_cost_and_tokens": 4408,
+      "cost_dropped_subagents": 435,
+      "cost_included": 5011,
+      "cost_dropped_empty_steps": 65
+    }
+  },
+  "terminalbench_no_rsc_subset": {
+    "runs_analyzed": 5371,
+    "loop_runs": 2253,
+    "loop_run_rate": 0.4194749581083597,
+    "total_steps": 170056,
+    "loop_steps": 20939,
+    "loop_step_share": 0.12313002775556288,
+    "productive_repeat_step_share": 0.09815590158536011,
+    "cost_eval_runs": 3787,
+    "total_cost_usd": 2663.985711575132,
+    "loop_cost_usd": 397.959578666926,
+    "loop_dollar_share": 0.14938502745633153,
+    "overall_pass_rate": 0.22267734127722957,
+    "looping_pass_rate": 0.19218819351975144,
+    "loop_free_pass_rate": 0.2447081462475946,
+    "exact_loop_runs": 1754,
+    "near_duplicate_runs": 890,
+    "aba_thrash_runs": 616,
+    "rotation_runs": 79,
+    "rotation_missed_by_cline": 67,
+    "rotation_missed_by_cline_pct": 0.8481012658227848,
+    "error_streak_runs": 572,
+    "redundant_reread_runs": 69,
+    "productive_repeat_runs": 2844,
+    "drop_audit": {
+      "note": "zero-RSC-pointer subset"
+    }
+  },
+  "terminalbench_turn_budgets": {
+    "openhands": 78,
+    "codex": 47,
+    "claude-code": 120,
+    "deepagent-harbor": 86,
+    "gemini-cli": 38,
+    "terminus-3-3": 54,
+    "mini-swe-agent": 45,
+    "terminus-2": 40,
+    "judy": 64
+  },
+  "swe_rebench": {
+    "runs_analyzed": 9435,
+    "loop_runs": 5188,
+    "loop_run_rate": 0.5498675145733969,
+    "total_steps": 631803,
+    "loop_steps": 25975,
+    "loop_step_share": 0.04111249867442858,
+    "productive_repeat_step_share": 0.01897901719365055,
+    "cost_eval_runs": 6381,
+    "total_cost_usd": 4927.872771,
+    "loop_cost_usd": 117.37791299765891,
+    "loop_dollar_share": 0.023819184961189597,
+    "overall_pass_rate": 0.5035506094329624,
+    "looping_pass_rate": 0.43138010794140325,
+    "loop_free_pass_rate": 0.5917117965622792,
+    "exact_loop_runs": 3639,
+    "near_duplicate_runs": 3147,
+    "aba_thrash_runs": 841,
+    "rotation_runs": 120,
+    "rotation_missed_by_cline": 118,
+    "rotation_missed_by_cline_pct": 0.9833333333333333,
+    "error_streak_runs": 1238,
+    "redundant_reread_runs": 1173,
+    "productive_repeat_runs": 4059,
+    "drop_audit": {
+      "total_rows": 9435,
+      "cost_dropped_rebuild_mismatch": 2494,
+      "cost_dropped_missing_reported_cost_and_tokens": 6,
+      "cost_included": 6381,
+      "cost_dropped_subagents": 554
+    }
+  },
+  "swe_rebench_turn_budgets": {
+    "opus-5": 126,
+    "glm-5.2": 198,
+    "gpt-5.6-luna": 25,
+    "deepseek-v4-pro": 125,
+    "grok-4.5": 89,
+    "codex": 39,
+    "minimax-m3": 364,
+    "claude-code": 120,
+    "qwen3.6-27b": 127,
+    "cursor": 113,
+    "mimo-v2.5-pro": 135,
+    "qwen3.6-35b-a3b": 133,
+    "fable-5": 96,
+    "sonnet-5": 133,
+    "junie": 109,
+    "gpt-5.6-sol": 33,
+    "qwen3.5-35b-a3b": 164
+  },
+  "tau2_bench": {
+    "files": 26,
+    "simulations": 10832,
+    "total_tool_steps": 99236,
+    "any_loop_sims": 2769,
+    "any_loop_rate": 0.2556314623338257,
+    "loop_steps": 10872,
+    "loop_step_share": 0.10955701559917772,
+    "productive_repeat_sims": 2387,
+    "productive_repeat_steps": 3703,
+    "exact_loop_sims": 2689,
+    "near_duplicate_sims": 19,
+    "aba_thrash_sims": 679,
+    "period_k_rotation_sims": 175,
+    "error_streak_sims": 160,
+    "redundant_reread_sims": 0,
+    "pass_rate_looping": 0.4835680751173709,
+    "pass_rate_loop_free": 0.7245442143122907,
+    "by_domain": {
+      "airline": {
+        "sims": 800,
+        "loop_sims": 105
+      },
+      "retail": {
+        "sims": 1824,
+        "loop_sims": 250
+      },
+      "telecom": {
+        "sims": 4560,
+        "loop_sims": 1469
+      },
+      "telecom-workflow": {
+        "sims": 3648,
+        "loop_sims": 945
+      }
+    }
+  },
+  "timings_sec": {
+    "download_and_schema_s": 0.12,
+    "terminalbench_analysis_s": 34.04,
+    "swe_rebench_analysis_s": 77.61,
+    "tau2_analysis_s": 5.74,
+    "plots_and_report_s": 0.56,
+    "total_s": 118.07
+  }
+}
