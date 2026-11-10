@@ -82,3 +82,82 @@ All figures below come verbatim from `results/summary.md`, `results/study_metric
 - Test hybrid detectors that combine rotation/thrash memory (period `k <= 5` A-B-A / multi-step cycles over canonicalized commands & exit codes) with adaptive step budgets instead of fixed thresholds.
 - Quantify cache-write / cache-miss spikes immediately following context compaction or idle TTL expiry where raw vendor logs include per-turn usage.
 - Add full system-prompt token lengths for harness wrappers like `claude-code` if upstream telemetry becomes available so `claude-code` passes the `[0.50x, 2.00x]` rebuild check without relaxing validation bounds.
+
+---
+
+## Phase 2 Pre-Registration: Do Open-Weight Models Loop More Than Closed Models?
+
+**Pre-registration lock**: The datasets, uniform-scaffold cohort boundaries, exclusions, pass-rate capability bands, uncertainty estimator, statistical regression specifications, and sensitivity checks below are locked and committed **before** computing or inspecting any Open-vs-Closed loop outcomes across the four datasets.
+
+### Research Question & Neutrality Rule
+Measure offline (CPU-only, fixed seed `42`, `labeler.py` untouched) whether open-weight models loop more than closed/proprietary models in agent trajectories when compared fairly within identical scaffolds and common task intersections, matched on capability, and adjusted for task difficulty, serving route, release vintage, and scaffold step caps. Every family (including Google's Gemini, Anthropic Claude, OpenAI GPT / `gpt-oss`, xAI Grok, Alibaba Qwen open vs proprietary Max, Z.ai GLM, DeepSeek, MiniMax, Moonshot Kimi, Thinking Machines Inkling, Xiaomi MiMo) is reported verbatim; null and reversed effects are given equal prominence.
+
+### Datasets & Schema / Token-Cost Coverage (Inspected 2026-11-10)
+All four public datasets are cached locally under gitignored `data/`:
+
+1. **Terminal-Bench 2.0** ([`yoonholee/terminalbench-trajectories`](https://huggingface.co/datasets/yoonholee/terminalbench-trajectories), `2` Parquet shards, `52,104` rows, `89` tasks):
+   - Columns: `task_name, agent, model, reward, duration_seconds, input_tokens, output_tokens, cache_tokens, cost_cents, trial_name, trial_id, started_at, ended_at, steps` (JSON array with `{msg, obs, src, tools: [{fn, cmd}]}`).
+   - Custom closed harnesses (`claude-code`, `codex`, `gemini-cli`, etc.) are **never** pooled against generic scaffolds. Fair within-scaffold slices (`89/89` shared tasks each):
+     - **`tb_terminus_2` (Primary TB slice)**: `29` step-logged models (`3` null-step models excluded: `glm-4.7@z-ai`, `gpt-5.3-codex@openai`, `kimi-k2.5@kimi`).
+     - **`tb_openhands` (Secondary TB slice)**: `12` step-logged models (`claude-opus-4-5` lacks tokens/cost).
+     - **`tb_mini_swe_agent` (Secondary TB slice)**: `13` step-logged models.
+   - TB token/cost gaps recorded in `terminus-2`: `gemini-3-flash-preview@gemini`, `glm-5@z-ai`, `gpt-5.2@openai`, `minimax-m2.1@openai`, and `openhands/claude-opus-4-5` have `tokens=0, cost=0`; `minimax-m2.5@Minimax` has tokens (`444/445`) with `cost_cents=0`. Models lacking `cost_cents` or failing `[0.50x, 2.00x]` rebuild validation are omitted from `loop_dollar_share` (never backfilled unless token totals pass `[0.50x, 2.00x]`), while keeping full step/loop metrics where `steps` exist.
+
+2. **SWE-rebench July 2026** ([`ibragim-bad/swe_rebench_07_2026_trajectories`](https://huggingface.co/datasets/ibragim-bad/swe_rebench_07_2026_trajectories), `85` gzipped JSONL shards, `9,435` rows):
+   - Primary uniform cohort **`swe_rebench_swelike`**: `participant.type == "common_scaffold_model"` (`scaffold == "swelike"` only; `claude-code`, `codex`, `cursor`, `junie` excluded from Open-vs-Closed pooling), yielding **13 models** (`7` Open, `6` Closed) × `5` runs × `111/111` shared tasks = `7,215` runs.
+   - Token/cost coverage: `555/555` runs per model have `usage.tokens` (including `cached_input > 0`); `0/555` report `cost_usd` (`cost_usd = null`), so `loop_dollar_share` uses cache-aware token rebuild validated at `[0.50x, 2.00x]` via public API list pricing. Max observed steps = `492` (`500`-step scaffold budget).
+
+3. **Longtail-SWE** ([`nebius/Longtail-SWE-trajectories`](https://huggingface.co/datasets/nebius/Longtail-SWE-trajectories), `arXiv:2611.10304`, `9` Parquet shards, `5,454` rows, `202/202` shared tasks × `3` runs × `2` cohorts):
+   - **`longtail_swe_swelike`**: All `9` configurations use `swelike` (`5` Open: `deepseek-v4-flash`, `glm-5.3-flash`, `kimi-k3`, `qwen3.6-27b`, `qwen3.8-27b`; `4` Closed: `claude-opus-5.5`, `gpt-5.6-luna`, `gpt-5.6-sol`, `gpt-6.1-sol`). Schema (`1.2.0`) mirrors SWE-rebench `events` (`prompt`, `assistant_message`, `tool_call`, `tool_result`, `final_message`).
+   - Important schema/confounder observations documented a priori:
+     - `gpt-6.1-sol` has `602/606` graded rows (`4` `resolved = null` skipped/timeout excluded from pass-rate denominator, kept for step traces if `n_steps >= 1`).
+     - `deepseek-v4-flash` has `49` zero-step API timeout failures (`steps = 0, tokens = 0, wall_time ~ 300s`).
+     - Context-limit asymmetry: Closed models + `deepseek-v4-flash` ran at `1,000K–1,050K` (`effective_context_tokens`), whereas `kimi-k3`, `glm-5.3-flash`, and `qwen3.8-27b` ran at `262,144`, and `qwen3.6-27b` ran at `262,144` (original) / `131,072` (statement_rerun).
+     - `cost_usd` is `null` across all 9 models; `usage.tokens` (`total` and `cached_input`) is populated on all executed (`n_steps >= 1`) runs. Observed max steps = `501` (`500` turn cap).
+     - Benchmark curation provenance: `Qwen 3.8 27B` was excluded from difficulty-calibration test attempts; `Kimi K3`, `GPT-5.6 Luna`, and `Claude Opus 5.5` participated in benchmark task curation (`NOTES`/limitations flag).
+
+4. **Sierra `tau2-bench` Public S3** (`s3://sierra-tau-bench-public/submissions/`, `27` non-voice `_sierra_` submissions cached):
+   - Schema inspection revealed two critical scaffold boundaries enforced a priori:
+     - **Uniform user simulator filter**: `gpt-5_sierra_2025-08-09` used `gpt-4.1-2025-04-14` as customer simulator, whereas all 26 2026 `_sierra_` submissions used `gpt-5.2` (`reasoning_effort = low`, `max_steps = 200` message turns, `max_errors = 10`). Therefore `gpt-5_sierra_2025-08-09` is excluded from fair pooling.
+     - **Two distinct uniform-scaffold cohorts**:
+       1. **`tau2_classic`** (`airline` + `retail` + `telecom`, `278/278` shared tasks × `4` trials = `1,112` runs/model): `8` models (`2` Open: `glm-5-think`, `qwen3.5-397b-a17b-think`; `6` Closed: `claude-opus-4-5`, `claude-sonnet-4-5`, `gemini-3-flash`, `gemini-3-pro`, `gpt-5-2`, `gpt-5-2-none`).
+       2. **`tau2_banking_knowledge_alltools`** (`banking_knowledge`, strictly matching `retrieval_config in {"AllTools", "alltools"}`, re-graded under `tau2-bench v1.0.1`, `97/97` shared tasks × `4` trials = `388` runs/model): **`20` models** (`3` Open: `glm-5-2`, `inkling`, `kimi-k3`; `17` Closed: `claude-fable-5`, `claude-opus-4-5`, `4-6`, `4-7`, `4-8`, `5`, `gemini-2-5-pro`, `gemini-3-1-pro-preview`, `gpt-5-2`, `gpt-5-4`, `gpt-5-5`, `gpt-5-6-sol`, `grok-4-fast`, `grok-4-1-fast`, `grok-4-2`, `grok-4-5`, `qwen3-8-max`).
+          - The `6` non-`AllTools` `banking_knowledge` submissions used incompatible tool/retrieval scaffolds (`terminal_use` without KB search: `claude-sonnet-4-5`, `gemini-3-flash`, `gemini-3-pro`; `openai_embeddings`: `glm-5-think`, `qwen3.5-397b`; `qwen_embeddings`: `gpt-5-2-none`) and are **excluded from `tau2_banking_knowledge_alltools`** (reported separately in inventory & Gemini notes).
+   - Sierra token/cost coverage: every executed simulation records per-turn `usage.prompt_tokens` and `usage.completion_tokens` (`cached_tokens` not broken out). `agent_cost > 0` is reported for 18 direct-provider/Vertex submissions and `0.0` for `claude-opus-4-6`, OpenRouter proxies (`glm-5-2`, `inkling`, `kimi-k3`, `qwen3-8-max`, `grok-4-5`), and self-hosted vLLM (`glm-5-think`, `qwen3.5-397b`). Where `agent_cost > 0`, turn `cost` is summed across executed steps (`reported_provider_usd`); where `agent_cost == 0.0` and tokens exist, per-turn USD is priced from `(prompt_tokens, completion_tokens)` × public API rates (`rebuilt_from_turn_tokens`), validated and tagged with explicit `cost_source` provenance so imputed vs provider-billed USD are never conflated.
+
+### Model Classification & Covariate Definitions (`src/agent_loops/model_catalog.py`)
+- **Open-Weights vs Closed edge cases**: `openai/gpt-oss-120b/20b`, `inkling` (`Thinking Machines`, Apache-2.0), `kimi-k3`, `glm-5.2/5.3-flash`, `deepseek-v4-flash/pro`, `qwen3.5/3.6/3.8-27b`, `minimax-m2..m3`, `mimo-v2.5-pro` are **Open-Weights**; **`qwen3-8-max` (`Qwen 3.8 Max`)**, `claude-*`, `gemini-*`, `gpt-5*/6*` (proprietary), `grok-*`, and `composer-2.5` are **Closed**.
+- **Serving Route (`first_party` vs `third_party`)**:
+  - TB: `@together_ai`, `@fireworks_ai`, `@modelscope`, and `minimax-m2.1@openai` are `third_party`; vendor native `@anthropic`, `@openai` (GPT), `@gemini`/`@google`, `@xai`, `@deepseek`, `@z-ai`, `@minimax`, `@kimi` are `first_party`.
+  - Sierra: `openrouter/*` (incl. `glm-5-2`, `inkling`, `kimi-k3`, `grok-4-5`, `qwen3-8-max`) and self-hosted `openai/glm-5-fp8` / `openai/qwen3.5-397b` are `third_party`; `anthropic/*`, `claude-*`, `vertex_ai/*`, `openai/responses/*`, `gpt-*`, `xai/*` are `first_party`.
+  - SWE-rebench `swelike`: uniform benchmark API gateway across all 13 models (`serving_route` constant within cohort, noted in regression output).
+  - Longtail-SWE `swelike`: official Anthropic/OpenAI APIs (`first_party`) for Closed; third-party/hosted endpoints (`third_party`) for Open.
+
+### Pre-Registered Outcome Metrics, Denominators & Uncertainty
+1. **Zero-step execution rule**: Primary behavioral denominators restrict to **executed runs (`n_steps >= 1`)** within each cohort's exact shared task intersection, because immediate `n_steps == 0` API timeouts (e.g., `49` `deepseek-v4-flash` timeouts on Longtail-SWE, or `infrastructure_error` at turn 0 on Sierra) never invoke a step and would otherwise artificially dilute `any_loop_rate`. Dropped zero-step counts are logged transparently in `results/loops_by_model_scaffold.csv`.
+2. **Sierra step extraction**: Every assistant turn emits one `NormalizedStep` per tool call (`tool_calls`) or, when an assistant message replies to the simulated user without calling tools, one non-tool dialogue step paired with the user reply; `label_trajectory` (`src/agent_loops/labeler.py`, **unchanged**) evaluates pathological tool loops over tool-bearing steps. Both `loops_per_100_steps` (`100 * loop_steps / n_steps`) and `loops_per_100_tool_steps` (`100 * loop_steps / n_tool_steps`) are reported.
+3. **Primary outcomes**:
+   - `loops_per_100_steps = 100 * sum(loop_steps) / sum(n_steps)` (exposure-normalized loop density).
+   - `any_loop_rate = mean(has_any_loop)` (share of executed runs with `>= 1` pathological loop step).
+   - Secondary outcomes: `loop_dollar_share` (cost-validated runs), `pass_rate_looping` vs `pass_rate_clean`, and taxonomy rates (`exact_loop`, `near_duplicate`, `aba_thrash`, `period_k_rotation`, `error_streak`, `redundant_reread`, `productive_repeat`).
+4. **Confidence Intervals**: **Task-clustered bootstrap (`n_boot = 1,000`, `seed = 42`, percentile 2.5%–97.5%)** resampling `task_id` clusters with replacement within each `(cohort, model)` or matched stratum so repeated trials on the same task are treated as correlated clusters.
+5. **Equal-model vs run-weighted aggregation**: Unmatched cohort Open-vs-Closed means weight each model equally (so TB models with 900+ trials do not receive double weight vs 445-trial models); run-weighted pooled totals are reported alongside for completeness.
+
+### Pre-Registered Capability Matching & Regression Models
+- **Uniform Capability Pass-Rate Bands**: `B1 [0.00, 0.25)`, `B2 [0.25, 0.40)`, `B3 [0.40, 0.55)`, `B4 [0.55, 0.75)`, `B5 [0.75, 1.01]`, chosen a priori without inspecting loop outcomes.
+  - Within each cohort, any band containing `>= 1` Open model and `>= 1` Closed model is an overlapping stratum.
+  - Within each overlapping band `b`, `Delta_b = equal_model_mean_Open,b - equal_model_mean_Closed,b`.
+  - Cohort matched difference averages `Delta_b` across overlapping bands weighted by balanced common-support `w_b = min(N_open_b, N_closed_b)` (bootstrap CIs re-computed inside each bootstrap task-cluster replicate).
+- **Regression Specifications (per cohort & pooled within-scaffold)**:
+  - **Count model**: **Negative Binomial GLM** with `log(n_steps)` offset (`Poisson` fallback checked if dispersion `<= 0`) modeling `loop_steps ~ is_open + pass_rate_10pp + release_months [+ serving_route] [+ task_id fixed effects]`, with **two-way Cameron-Gelbach-Miller cluster-robust standard errors clustered simultaneously on `(model_id, task_id)`**.
+  - **Binary model**: **Logistic regression (`Logit`)** for `has_any_loop` (both with and without `log1p(n_steps)` exposure control) with task fixed effects and two-way `(model_id, task_id)` cluster-robust SEs.
+  - **Mixed-effects robustness check**: `statsmodels` `PoissonBayesMixedGLM` (with `log(n_steps)` offset) / `BinomialBayesMixedGLM` including random `task_id` intercept alongside model-level covariates.
+  - Whenever a covariate (`serving_route`, `step_cap`) is collinear with `is_open` or constant within a cohort, it is automatically omitted from that single-cohort fit and noted explicitly.
+
+### Pre-Registered Sensitivity Checks (All 5 Reported)
+1. **`pass_only`**: Only `succeeded == True` executed trajectories (separates intrinsic looping/verification habits from brick-wall task failure).
+2. **`fail_only`**: Only `succeeded == False` executed trajectories.
+3. **`drop_gpt_oss`**: Drops legacy `openai/gpt-oss-20b` and `openai/gpt-oss-120b` on Terminal-Bench.
+4. **`first_party_only`**: Retains `first_party` API routes only (and explicitly marks cohorts where Open models only ran via third-party gateways).
+5. **`per_family`**: Model-family breakdown (`claude`, `gpt`, `gemini`, `grok`, `qwen`, `glm`, `minimax`, `deepseek`, `kimi`, `gpt_oss`, `inkling`, `mimo`) across every cohort.
+

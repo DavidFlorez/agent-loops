@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
+from agent_loops.model_catalog import is_open_weight_model
 from agent_loops.study import (
     CompactRunRecord,
     analyze_swe_rebench,
@@ -17,45 +18,7 @@ from agent_loops.study import (
     analyze_terminalbench,
 )
 
-OPEN_WEIGHT_PATTERNS = (
-    "qwen/",
-    "accounts/fireworks/models/glm-",
-    "accounts/fireworks/models/minimax-",
-    "deepseek-",
-    "deepseek/",
-    "glm-",
-    "kimi-",
-    "minimax-",
-    "minimax/",
-    "moonshotai/",
-    "openai/gpt-oss-",
-    "xiaomi/",
-    "z-ai/",
-)
-
-CLOSED_PATTERNS = (
-    "claude-",
-    "composer-",
-    "fable-",
-    "gemini-",
-    "gpt-",
-    "grok-",
-    "x-ai/",
-)
-
 SWE_AGENTIC_HARNESSES = frozenset({"claude-code", "codex", "cursor", "junie"})
-
-
-def is_open_weight_model(model: str) -> bool:
-    """Classify a model identifier as Open-Weights (True) or Closed/Proprietary (False)."""
-    ml = (model or "").strip().lower()
-    if ml.startswith("openai/gpt-oss-"):
-        return True
-    if ml.startswith(CLOSED_PATTERNS):
-        return False
-    if ml.startswith(OPEN_WEIGHT_PATTERNS):
-        return True
-    raise ValueError(f"Unclassified model name for open vs closed split: {model!r}")
 
 
 def _fmt_pct(val: float | None) -> str:
