@@ -11,6 +11,7 @@ from agent_loops.plots import (
     plot_loop_prevalence_by_harness,
     plot_step_vs_dollar_share,
 )
+from agent_loops.extra_reports import generate_extra_reports
 from agent_loops.report import write_results_and_summary
 from agent_loops.study import (
     aggregate_group_metrics,
@@ -99,6 +100,13 @@ def main() -> None:
         tb_by_harness,
         swe_by_harness,
         assets_dir / "loop_prevalence_by_harness.png",
+    )
+    generate_extra_reports(
+        data_dir=data_dir,
+        results_dir=results_dir,
+        tb_records=tb_records,
+        swe_records=swe_records,
+        tau2_summary=tau2_summary,
     )
     timings["plots_and_report_s"] = round(time.perf_counter() - t0, 2)
     timings["total_s"] = round(time.perf_counter() - t_start, 2)

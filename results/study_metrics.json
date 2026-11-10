@@ -67,14 +67,14 @@
     }
   },
   "terminalbench_turn_budgets": {
+    "terminus-3-3": 54,
+    "terminus-2": 40,
     "openhands": 78,
-    "codex": 47,
-    "claude-code": 120,
     "deepagent-harbor": 86,
     "gemini-cli": 38,
-    "terminus-3-3": 54,
     "mini-swe-agent": 45,
-    "terminus-2": 40,
+    "codex": 47,
+    "claude-code": 120,
     "judy": 64
   },
   "swe_rebench": {
@@ -110,23 +110,23 @@
     }
   },
   "swe_rebench_turn_budgets": {
-    "opus-5": 126,
-    "glm-5.2": 198,
-    "gpt-5.6-luna": 25,
-    "deepseek-v4-pro": 125,
     "grok-4.5": 89,
-    "codex": 39,
-    "minimax-m3": 364,
-    "claude-code": 120,
-    "qwen3.6-27b": 127,
-    "cursor": 113,
+    "gpt-5.6-luna": 25,
+    "qwen3.5-35b-a3b": 164,
     "mimo-v2.5-pro": 135,
     "qwen3.6-35b-a3b": 133,
-    "fable-5": 96,
-    "sonnet-5": 133,
-    "junie": 109,
+    "minimax-m3": 364,
+    "deepseek-v4-pro": 125,
+    "glm-5.2": 198,
+    "codex": 39,
     "gpt-5.6-sol": 33,
-    "qwen3.5-35b-a3b": 164
+    "fable-5": 96,
+    "opus-5": 126,
+    "cursor": 113,
+    "junie": 109,
+    "qwen3.6-27b": 127,
+    "claude-code": 120,
+    "sonnet-5": 133
   },
   "tau2_bench": {
     "files": 26,
@@ -166,11 +166,11 @@
     }
   },
   "timings_sec": {
-    "download_and_schema_s": 0.12,
-    "terminalbench_analysis_s": 34.04,
-    "swe_rebench_analysis_s": 77.61,
-    "tau2_analysis_s": 5.74,
-    "plots_and_report_s": 0.56,
-    "total_s": 118.07
+    "download_and_schema_s": 0.08,
+    "terminalbench_analysis_s": 34.4,
+    "swe_rebench_analysis_s": 76.86,
+    "tau2_analysis_s": 5.8,
+    "plots_and_report_s": 2.5,
+    "total_s": 119.64
   }
 }
