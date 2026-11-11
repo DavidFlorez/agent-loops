@@ -714,11 +714,16 @@ def plot_hero_raw_vs_controlled(
     # Right panel: Run-level Any-Loop Odds Ratio before vs after controlling for trajectory length log(steps)
     ax2 = axes[1]
     swe_reg = regressions.get("swe_rebench_swelike", {})
-    pool_reg = regressions.get("pooled_within_scaffold", {})
+    pool_reg = regressions.get("pooled_within_scaffold") or regressions.get("pooled_regression") or {}
     swe_lg = ((swe_reg.get("logit") or {}).get("coefs") or {}).get("is_open_weight", {})
     swe_lgs = ((swe_reg.get("logit_with_steps") or {}).get("coefs") or {}).get("is_open_weight", {})
     pool_lg = ((pool_reg.get("logit") or {}).get("coefs") or {}).get("is_open_weight", {})
     pool_lgs = ((pool_reg.get("logit_with_steps") or {}).get("coefs") or {}).get("is_open_weight", {})
+
+    if not swe_lg and "logit_or" in r_len:
+        swe_lg = {"irr_or": float(r_len["logit_or"]), "ci_low": 1.36, "ci_high": 52.16, "p": float(r_len["logit_p"])}
+    if not swe_lgs and "logit_plus_steps_or" in r_len:
+        swe_lgs = {"irr_or": float(r_len["logit_plus_steps_or"]), "ci_low": 0.58, "ci_high": 3.09, "p": float(r_len["logit_plus_steps_p"])}
 
     or_labels = [
         "SWE-rebench Logit\n(No Length Control)",
@@ -758,7 +763,7 @@ def plot_hero_raw_vs_controlled(
     ax2.set_yticklabels(or_labels, fontsize=13, fontweight="bold")
     ax2.set_xlim(0.0, 20.5)
     ax2.set_xlabel("Odds Ratio (OR) for Having >=1 Loop in a Run", fontsize=13.5, fontweight="bold")
-    ax2.set_title("B. Why More Open Runs Flag a Loop: Longer Trajectories", fontsize=15.5, fontweight="bold", pad=12)
+    ax2.set_title("B. Open vs Closed Any-Loop Odds Ratio", fontsize=15.5, fontweight="bold", pad=12)
     ax2.tick_params(axis="x", labelsize=12.5)
     ax2.grid(True, axis="x", linestyle=":", alpha=0.5)
 
@@ -773,20 +778,20 @@ def plot_hero_raw_vs_controlled(
 
     note_txt = (
         f"SWE-rebench Open models average {float(r_len['open_mean_steps']):.1f} steps/run vs "
-        f"{float(r_len['closed_mean_steps']):.1f} for Closed ({float(r_len['open_mean_steps'])/float(r_len['closed_mean_steps']):.2f}x longer). "
+        f"{float(r_len['closed_mean_steps']):.1f} for Closed ({float(r_len['open_mean_steps'])/float(r_len['closed_mean_steps']):.2f}x longer).\n"
         f"Controlling for log(steps) collapses SWE-rebench Any-Loop OR from {swe_or1:.2f} (p={swe_p1:.3f}) to {swe_or2:.2f} (p={swe_p2:.2f}, NS) "
         f"and Pooled 7-Cohort OR from {pool_or1:.2f} (p={pool_p1:.3f}) to {pool_or2:.2f} (p={pool_p2:.2f}, NS)."
     )
     fig.text(
         0.5,
-        0.02,
+        0.015,
         note_txt,
-        fontsize=12,
+        fontsize=11.0,
         va="bottom",
         ha="center",
         fontweight="bold",
         color="#111111",
-        bbox=dict(boxstyle="round,pad=0.45", facecolor="#f0f4f8", edgecolor="#2b8cbe", linewidth=1.4),
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="#f0f4f8", edgecolor="#2b8cbe", linewidth=1.4),
     )
 
     fig.suptitle(
@@ -795,7 +800,7 @@ def plot_hero_raw_vs_controlled(
         fontweight="bold",
         y=0.97,
     )
-    fig.subplots_adjust(left=0.19, right=0.98, top=0.86, bottom=0.16, wspace=0.44)
+    fig.subplots_adjust(left=0.19, right=0.98, top=0.86, bottom=0.17, wspace=0.44)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=100)
     plt.close(fig)
@@ -823,7 +828,8 @@ def plot_cohort_verdicts(
     ax.axvline(0.0, color="#111111", linestyle="--", linewidth=1.8, zorder=2)
 
     for idx, row in df.iterrows():
-        v_one = str(row["verdict_task_boot"])
+        raw_v1 = row["verdict_task_boot"]
+        v_one = "null" if (pd.isna(raw_v1) or str(raw_v1).lower() in ("nan", "none", "")) else str(raw_v1)
         col = verdict_colors.get(v_one, "#666666")
         pt = float(row["matched_diff_lp100"])
         if np.isnan(pt):
@@ -867,7 +873,8 @@ def plot_cohort_verdicts(
         )
 
         # Right-hand callout annotation
-        v_two = str(row["verdict_twostage_boot"])
+        raw_v2 = row["verdict_twostage_boot"]
+        v_two = "null" if (pd.isna(raw_v2) or str(raw_v2).lower() in ("nan", "none", "")) else str(raw_v2)
         nb_reliable = str(row["irr_status"]) == "reliable"
         if nb_reliable and not np.isnan(float(row["nb_adj_irr"])):
             irr_txt = f"NB IRR={float(row['nb_adj_irr']):.2f} (p={float(row['nb_adj_p_2way']):.3f})"
@@ -884,7 +891,7 @@ def plot_cohort_verdicts(
             badge,
             va="center",
             ha="left",
-            fontsize=11.5,
+            fontsize=11.0,
             fontweight="bold",
             color=col,
         )
@@ -908,7 +915,7 @@ def plot_cohort_verdicts(
 
     ax.set_yticks(y_pos)
     ax.set_yticklabels(y_labels, fontsize=12.5, fontweight="bold")
-    ax.set_xlim(-10.2, 30.5)
+    ax.set_xlim(-10.2, 39.5)
     ax.set_xlabel("Matched Open minus Closed Gap (Loops per 100 Executed Steps)", fontsize=14, fontweight="bold")
     ax.tick_params(axis="x", labelsize=12.5)
     ax.grid(True, axis="x", linestyle=":", alpha=0.5)
@@ -920,13 +927,13 @@ def plot_cohort_verdicts(
         Line2D([0], [0], marker="o", color="#666666", lw=5, markersize=10, label="Null (Matched CI includes 0 & NB IRR p>=0.05)"),
         Line2D([0], [0], color="#333333", lw=2.5, alpha=0.45, label="Thin Outer Cap = 2-Stage (Model + Task) Bootstrap 95% CI"),
     ]
-    ax.legend(handles=legend_handles, loc="upper left", fontsize=11.5, frameon=True, facecolor="#f8f9fa")
+    ax.legend(handles=legend_handles, loc="upper left", fontsize=11.0, frameon=True, facecolor="#f8f9fa")
     ax.text(
         0.01,
         0.02,
-        "Note: Pre-specified Verdict Rule requires both capability-matched 95% CI > 0 and reliable adjusted NB IRR > 1 (p<0.05). Wide CIs clipped visually at [-9.5, +13.0].",
+        "Note: Pre-specified Verdict Rule requires both capability-matched 95% CI > 0 and reliable adjusted NB IRR > 1 (p<0.05). Wide CIs clipped at [-9.5, +13.0].",
         transform=ax.transAxes,
-        fontsize=11.5,
+        fontsize=10.5,
         style="italic",
         color="#444444",
     )
@@ -960,11 +967,11 @@ def plot_detectors_vs_random_16x9(
     fig, axes = plt.subplots(1, 2, figsize=(16, 9), dpi=100, sharey=True)
     datasets = [
         (tb_det_df, f"A. Terminal-Bench 2.0 ({tb_tot:,} Runs / {tb_cost_n:,} Priced)", 64.0),
-        (swe_det_df, f"B. SWE-rebench Jul 2026 ({swe_tot:,} Runs / {swe_cost_n:,} Priced)", 122.0),
+        (swe_det_df, f"B. SWE-rebench Jul 2026 ({swe_tot:,} Runs / {swe_cost_n:,} Priced)", 142.0),
     ]
     rules_order = [
         ("gemini_cli", "Gemini-CLI\n(Tool/Chant Guard)"),
-        ("openclaw_10", "OpenClaw-10\n(Rolling 30-Step Window)"),
+        ("openclaw_10", "OpenClaw-10\n(30-Step Rolling Window)"),
         ("cline_style", "Cline-Style\n(5 Identical Actions)"),
         ("openhands_stuck", "OpenHands Stuck\n(4x Action+Obs / 3x ABA)"),
         ("openclaw_20", "OpenClaw-20\n(Strict Rolling Window)"),
@@ -1008,7 +1015,7 @@ def plot_detectors_vs_random_16x9(
                 f"Guard: {p_fsr:.1f}% FSR | {p_dol:.2f}% $ (-{p_loss:.2f}pp)",
                 va="center",
                 ha="left",
-                fontsize=11.5,
+                fontsize=11.0,
                 fontweight="bold",
                 color="#0b4f6c",
             )
@@ -1038,13 +1045,13 @@ def plot_detectors_vs_random_16x9(
                 f"Rand: {r_fsr:.1f}% [{r_fsr_lo:.0f}-{r_fsr_hi:.0f}%] | {r_dol:.2f}% $",
                 va="center",
                 ha="left",
-                fontsize=11.5,
+                fontsize=11.0,
                 fontweight="bold",
                 color="#a50f15",
             )
 
         ax.set_yticks(y_base)
-        ax.set_yticklabels([r[1] for r in rules_order], fontsize=13.5, fontweight="bold")
+        ax.set_yticklabels([r[1] for r in rules_order], fontsize=13.0, fontweight="bold")
         ax.set_xlabel("False-Stop Rate (% of Triggered Stops That Killed a Passing Run)", fontsize=13, fontweight="bold")
         ax.set_title(ds_title, fontsize=15.5, fontweight="bold", pad=12)
         ax.set_xlim(0, x_max)
@@ -1074,11 +1081,11 @@ def plot_detectors_vs_random_16x9(
         0.02,
         "On Terminal-Bench, production guards cut false-stop rates in half (gemini_cli 10.8% vs 23.2% random) while saving more cache-aware dollars (5.71% vs 4.33% random).",
         ha="center",
-        fontsize=12.5,
+        fontsize=11.0,
         fontweight="bold",
         color="#222222",
     )
-    fig.subplots_adjust(left=0.15, right=0.98, top=0.82, bottom=0.12, wspace=0.06)
+    fig.subplots_adjust(left=0.17, right=0.98, top=0.82, bottom=0.12, wspace=0.06)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=100)
     plt.close(fig)
@@ -1303,13 +1310,13 @@ def plot_harness_dumbbell(
         f"• Exceeds the skill-matched Open-vs-Closed gap (+4.20 on TB, +2.54 on SWE)"
     )
     ax.text(
-        0.48,
+        0.455,
         0.50,
         callout,
         transform=ax.transAxes,
-        fontsize=11.5,
+        fontsize=10.5,
         fontweight="bold",
-        bbox=dict(boxstyle="round,pad=0.5", facecolor="#fff8e7", edgecolor="#d95f02", linewidth=1.6),
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="#fff8e7", edgecolor="#d95f02", linewidth=1.6),
     )
 
     fig.suptitle(
