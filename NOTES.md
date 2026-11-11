@@ -188,7 +188,7 @@ All four public datasets are cached locally under gitignored `data/`:
 | `longtail_swe_swelike` | **Closed** | 155 | 1 | **0.6%** |
 
 ### 2. Run-Length Control & Step-Decile Matching (`results/length_matched_comparison.csv`)
-- Controlling for `log(steps)` in run-level Logistic regression reduces the `swe_rebench_swelike` Open-vs-Closed Any-Loop Odds Ratio from **8.43 (`p=0.0005`)** to **1.34 (`p=0.58`)** and the pooled 7-cohort OR from **2.25 (`p=0.024`)** to **1.47 (`p=0.25`)**.
+- Controlling for `log(steps)` in run-level Logistic regression reduces the `swe_rebench_swelike` Open-vs-Closed Any-Loop Odds Ratio from **8.43 (`p=0.022`)** to **1.34 (`p=0.49`)** and the pooled 7-cohort OR from **2.25 (`p=0.024`)** to **1.47 (`p=0.25`)**.
 
 | Cohort | Open vs Closed Mean Steps | Unmatched Gap | Skill-Matched Gap | Length-Decile Matched Gap [95% CI] | Skill+Length Matched Gap [95% CI] |
 | --- | ---: | ---: | ---: | ---: | ---: |

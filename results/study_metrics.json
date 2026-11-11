@@ -67,15 +67,15 @@
     }
   },
   "terminalbench_turn_budgets": {
-    "codex": 47,
-    "gemini-cli": 38,
-    "claude-code": 120,
-    "openhands": 78,
+    "terminus-3-3": 54,
     "deepagent-harbor": 86,
-    "judy": 64,
-    "mini-swe-agent": 45,
     "terminus-2": 40,
-    "terminus-3-3": 54
+    "gemini-cli": 38,
+    "openhands": 78,
+    "codex": 47,
+    "claude-code": 120,
+    "judy": 64,
+    "mini-swe-agent": 45
   },
   "swe_rebench": {
     "runs_analyzed": 9435,
@@ -110,23 +110,23 @@
     }
   },
   "swe_rebench_turn_budgets": {
-    "codex": 39,
-    "cursor": 113,
-    "gpt-5.6-sol": 33,
-    "fable-5": 96,
-    "claude-code": 120,
-    "grok-4.5": 89,
-    "glm-5.2": 198,
-    "deepseek-v4-pro": 125,
-    "qwen3.6-35b-a3b": 133,
-    "junie": 109,
     "sonnet-5": 133,
-    "opus-5": 126,
-    "minimax-m3": 364,
     "qwen3.6-27b": 127,
     "qwen3.5-35b-a3b": 164,
+    "junie": 109,
+    "deepseek-v4-pro": 125,
+    "cursor": 113,
+    "opus-5": 126,
+    "glm-5.2": 198,
+    "codex": 39,
+    "claude-code": 120,
+    "gpt-5.6-luna": 25,
+    "grok-4.5": 89,
+    "minimax-m3": 364,
+    "qwen3.6-35b-a3b": 133,
     "mimo-v2.5-pro": 135,
-    "gpt-5.6-luna": 25
+    "fable-5": 96,
+    "gpt-5.6-sol": 33
   },
   "tau2_bench": {
     "files": 26,
@@ -627,23 +627,23 @@
         "converged": true,
         "n_obs": 56797,
         "n_random_tasks": 951,
-        "task_re_sd": 0.9263200170450253,
-        "is_open_coef": 0.9579259628332447,
-        "is_open_or": 2.6062853312636585,
-        "is_open_sd_vb": 0.016637096553131166,
+        "task_re_sd": 0.9263200133395197,
+        "is_open_coef": 0.9579259574799383,
+        "is_open_or": 2.6062853173114147,
+        "is_open_sd_vb": 0.01663709682688524,
         "p_vb": 0.0
       }
     }
   },
   "timings_sec": {
-    "download_and_schema_s": 110.58,
-    "terminalbench_analysis_s": 21.67,
-    "swe_rebench_analysis_s": 13.42,
-    "longtail_and_sierra_s": 19.53,
-    "fair_open_vs_closed_s": 262.31,
-    "phase3_audit_and_bootstraps_s": 40.57,
-    "plots_and_report_s": 54.16,
-    "total_s": 481.66
+    "download_and_schema_s": 115.36,
+    "terminalbench_analysis_s": 21.58,
+    "swe_rebench_analysis_s": 13.62,
+    "longtail_and_sierra_s": 20.8,
+    "fair_open_vs_closed_s": 261.04,
+    "phase3_audit_and_bootstraps_s": 40.68,
+    "plots_and_report_s": 54.31,
+    "total_s": 486.71
   },
   "phase3_summary": {
     "tb_cost_audit": {
@@ -789,6 +789,6 @@
         }
       ]
     },
-    "article_word_count": 1492
+    "article_word_count": 1482
   }
 }
