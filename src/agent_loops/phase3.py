@@ -938,7 +938,7 @@ def compute_length_matched_comparison(
         cap_closed_num = 0.0
         for b in lp_m["bands"]:
             if b["overlap"]:
-                wb = float(b["support_weight"])
+                wb = float(b.get("weight", b.get("support_weight", 0.0)))
                 w_b_sum += wb
                 cap_open_num += wb * float(b["open_mean"])
                 cap_closed_num += wb * float(b["closed_mean"])
@@ -1249,7 +1249,7 @@ def diagnose_tau2_classic_and_build_verdicts(
         c_m_num = 0.0
         for b in lp["bands"]:
             if b["overlap"]:
-                w = float(b["support_weight"])
+                w = float(b.get("weight", b.get("support_weight", 0.0)))
                 w_sum += w
                 o_m_num += w * float(b["open_mean"])
                 c_m_num += w * float(b["closed_mean"])
