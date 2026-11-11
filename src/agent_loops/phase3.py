@@ -1584,9 +1584,9 @@ def audit_tb_cost_rebuild_and_null_models(
             ca_t = float(r.reported_cache_tokens or 0.0)
             out_t = float(r.reported_output_tokens)
             # Case A: input_tokens EXCLUDES cache_tokens (so total input = in_t + ca_t)
-            usd_excl = (in_t * p.input_per_mtok + ca_t * p.cached_input_per_mtok + out_t * p.output_per_mtok) / 1e6
+            usd_excl = (in_t * p.input_per_m + ca_t * p.cached_per_m + out_t * p.output_per_m) / 1e6
             # Case B: input_tokens INCLUDES cache_tokens (so uncached = max(0, in_t - ca_t))
-            usd_incl = (max(0.0, in_t - ca_t) * p.input_per_mtok + ca_t * p.cached_input_per_mtok + out_t * p.output_per_mtok) / 1e6
+            usd_incl = (max(0.0, in_t - ca_t) * p.input_per_m + ca_t * p.cached_per_m + out_t * p.output_per_m) / 1e6
             tok_ratios_add_cache.append(usd_excl / r.reported_cost_usd_raw)
             tok_ratios_sub_cache.append(usd_incl / r.reported_cost_usd_raw)
 
