@@ -26,6 +26,7 @@ from agent_loops.canonicalize import (
 )
 from agent_loops.cost import (
     detect_compaction_or_subagents,
+    get_model_pricing,
     rebuild_trajectory_costs,
 )
 from agent_loops.detectors import (
@@ -88,6 +89,12 @@ class CompactRunRecord:
     step_costs: np.ndarray  # float64 array of length n_steps (empty if not cost_included)
     stop_steps: dict[str, int | None]
     has_rsc_ref: bool
+    graded: bool = True
+    context_limit_tokens: int | None = None
+    cost_source: str | None = None
+    litellm_llm: str | None = None
+    cohort: str | None = None
+    retrieval_config: str | None = None
 
 
 def _is_finite_pos(val: Any) -> bool:
@@ -128,20 +135,39 @@ def _analyze_single_trajectory(
     disable_cache_discount: bool,
     compaction_reason: str | None,
     has_rsc: bool,
+    graded: bool = True,
+    context_limit_tokens: int | None = None,
+    cost_source: str | None = None,
+    litellm_llm: str | None = None,
+    cohort: str | None = None,
+    retrieval_config: str | None = None,
+    step_costs_override: list[float] | None = None,
 ) -> CompactRunRecord:
     step_labels = label_trajectory(steps)
-    cost_res = rebuild_trajectory_costs(
-        steps,
-        model_name=model,
-        initial_prompt_chars=initial_prompt_chars,
-        reported_cost_usd=reported_cost_usd,
-        reported_uncached_input_tokens=reported_uncached_in,
-        reported_cached_input_tokens=reported_cached_in,
-        reported_output_tokens=reported_out,
-        reported_total_input_tokens=reported_total_in,
-        disable_cache_discount=disable_cache_discount,
-        compaction_or_subagent_reason=compaction_reason,
-    )
+    if step_costs_override is not None and compaction_reason is None and len(step_costs_override) == len(steps) and steps:
+        cost_included = True
+        drop_reason = None
+        mismatch_ratio = 1.0
+        step_costs_list = list(step_costs_override)
+        total_cost_usd = float(sum(step_costs_list))
+    else:
+        cost_res = rebuild_trajectory_costs(
+            steps,
+            model_name=model,
+            initial_prompt_chars=initial_prompt_chars,
+            reported_cost_usd=reported_cost_usd,
+            reported_uncached_input_tokens=reported_uncached_in,
+            reported_cached_input_tokens=reported_cached_in,
+            reported_output_tokens=reported_out,
+            reported_total_input_tokens=reported_total_in,
+            disable_cache_discount=disable_cache_discount,
+            compaction_or_subagent_reason=compaction_reason,
+        )
+        cost_included = cost_res.included
+        drop_reason = cost_res.drop_reason
+        mismatch_ratio = cost_res.mismatch_ratio
+        step_costs_list = cost_res.step_costs_usd
+        total_cost_usd = cost_res.total_cost_usd
 
     label_counts: dict[str, int] = {k: 0 for k in ALL_STEP_LABELS}
     all_tags: set[str] = set()
@@ -153,8 +179,8 @@ def _analyze_single_trajectory(
         all_tags.update(sl.labels)
         if sl.is_loop:
             loop_steps += 1
-            if cost_res.included:
-                loop_cost += cost_res.step_costs_usd[idx]
+            if cost_included:
+                loop_cost += step_costs_list[idx]
         elif "productive_repeat" in sl.labels:
             prod_steps += 1
 
@@ -166,16 +192,16 @@ def _analyze_single_trajectory(
         task_name=task_name,
         succeeded=succeeded,
         steps=steps,
-        step_costs_usd=cost_res.step_costs_usd,
-        cost_included=cost_res.included,
+        step_costs_usd=step_costs_list,
+        cost_included=cost_included,
         has_any_loop=has_any_loop,
         has_rotation_loop=("period_k_rotation" in all_tags),
     )
     stop_steps = {dname: fn(replay_obj) for dname, fn in _STATIC_DETECTORS.items()}
 
     sc_arr = (
-        np.array(cost_res.step_costs_usd, dtype=np.float64)
-        if cost_res.included
+        np.array(step_costs_list, dtype=np.float64)
+        if cost_included
         else np.empty(0, dtype=np.float64)
     )
     return CompactRunRecord(
@@ -198,14 +224,20 @@ def _analyze_single_trajectory(
         loop_steps=loop_steps,
         productive_repeat_steps=prod_steps,
         label_step_counts=label_counts,
-        cost_included=cost_res.included,
-        drop_reason=cost_res.drop_reason,
-        mismatch_ratio=cost_res.mismatch_ratio,
-        total_cost_usd=cost_res.total_cost_usd,
+        cost_included=cost_included,
+        drop_reason=drop_reason,
+        mismatch_ratio=mismatch_ratio,
+        total_cost_usd=total_cost_usd,
         loop_cost_usd=loop_cost,
         step_costs=sc_arr,
         stop_steps=stop_steps,
         has_rsc_ref=has_rsc,
+        graded=graded,
+        context_limit_tokens=context_limit_tokens,
+        cost_source=cost_source if cost_included else None,
+        litellm_llm=litellm_llm,
+        cohort=cohort,
+        retrieval_config=retrieval_config,
     )
 
 
@@ -352,6 +384,8 @@ def _process_tb_batch(rows: list[dict[str, Any]]) -> tuple[list[CompactRunRecord
             disable_cache_discount=disable_cache,
             compaction_reason=comp_reason,
             has_rsc=has_rsc,
+            cost_source="reported_usd_rebuilt",
+            cohort=f"tb_{agent.replace('-', '_')}",
         )
         records.append(rec)
         counts["rows_with_steps"] += 1
@@ -388,7 +422,7 @@ def analyze_terminalbench(data_dir: Path) -> tuple[list[CompactRunRecord], dict[
 
 
 def _extract_swe_tokens(rec: dict[str, Any]) -> tuple[float | None, float | None, float | None, float | None, float | None, int]:
-    """Return (cost_usd, uncached_in, cached_in, out_tok, total_in_all, aux_tok) for SWE-rebench."""
+    """Return (cost_usd, uncached_in, cached_in, out_tok, total_in_all, aux_tok) for SWE-style logs."""
     u = rec.get("usage") or {}
     cost_usd = u.get("cost_usd")
     rep_cost = float(cost_usd) if _is_finite_pos(cost_usd) else None
@@ -425,6 +459,157 @@ def _extract_swe_tokens(rec: dict[str, Any]) -> tuple[float | None, float | None
     return rep_cost, uncached_in, cached_f, out_f, total_in_all, aux
 
 
+def _parse_swe_style_trajectory(
+    rec: dict[str, Any],
+    *,
+    dataset: str,
+    harness: str,
+    model: str,
+    task_name: str,
+    traj_id: str,
+    succeeded: bool,
+    graded: bool = True,
+    context_limit_tokens: int | None = None,
+    cohort: str | None = None,
+) -> CompactRunRecord:
+    """Parse one SWE-style normalized trajectory dict into a CompactRunRecord."""
+    events = rec.get("events") or []
+    init_chars = 0
+    has_multi_prompts = False
+    extra_texts: list[str] = []
+    tool_results_by_id: dict[str, dict[str, Any]] = {}
+    for ev in events:
+        if ev.get("type") == "tool_result" and ev.get("tool_call_id"):
+            tool_results_by_id[ev["tool_call_id"]] = ev
+
+    norm_steps: list[NormalizedStep] = []
+    pending_text_parts: list[str] = []
+
+    for ev in events:
+        et = ev.get("type")
+        if et == "prompt":
+            msgs = ev.get("messages") or []
+            pchars = sum(len(str(m.get("content") or "")) for m in msgs)
+            if ev.get("seq", 0) == 0:
+                init_chars += pchars
+            else:
+                has_multi_prompts = True
+            for m in msgs:
+                extra_texts.append(str(m.get("content") or ""))
+        elif et in ("assistant_message", "assistant_analysis", "final_message"):
+            c = ev.get("content")
+            if isinstance(c, str) and c:
+                pending_text_parts.append(c)
+            elif c is not None:
+                pending_text_parts.append(str(c))
+        elif et == "tool_call":
+            tc_id = ev.get("tool_call_id") or ""
+            tr = tool_results_by_id.get(tc_id)
+            obs_raw = tr.get("content") if tr else None
+            obs_str = (
+                obs_raw
+                if isinstance(obs_raw, str)
+                else ("" if obs_raw is None else orjson.dumps(obs_raw).decode("utf-8", errors="replace"))
+            )
+            orig_bytes = tr.get("content_bytes_original") if tr else None
+            obs_chars = max(len(obs_str), int(orig_bytes or 0))
+            assistant_txt = "\n".join(pending_text_parts)
+            pending_text_parts.clear()
+
+            tname = ev.get("tool") or "unknown"
+            inp = ev.get("input")
+            inp_len = len(orjson.dumps(inp)) if inp is not None else 0
+            ns = make_step(
+                len(norm_steps),
+                tool_name=tname,
+                raw_args=inp,
+                obs=obs_str,
+                assistant_text=assistant_txt,
+                status=tr.get("status") if tr else None,
+                exit_code=tr.get("exit_code") if tr else None,
+                error_field=tr.get("error") if tr else None,
+                is_tb_coarse_schema=False,
+                msg_chars_override=len(assistant_txt) + len(tname) + inp_len,
+                obs_chars_override=obs_chars,
+            )
+            norm_steps.append(ns)
+        elif et == "agent_step":
+            assistant_txt = "\n".join(pending_text_parts)
+            pending_text_parts.clear()
+            sname = (ev.get("name") or "").strip()
+            scontent = ev.get("content")
+            obs_str = scontent if isinstance(scontent, str) else str(scontent or "")
+            first_line = obs_str.splitlines()[0].strip() if obs_str else ""
+            if sname in ("Opened file", "Open file"):
+                tname_step = "read"
+                raw_a: Any = {"file_path": first_line} if first_line else None
+            elif sname in ("Edited files", "Edited file"):
+                tname_step = "edit"
+                raw_a = None  # junie summary omits diff/path details; file_op becomes write_any
+            elif sname in ("Fetch URL", "Read skill", "Web search"):
+                tname_step = sname.lower().replace(" ", "_")
+                raw_a = first_line if first_line else None
+            else:
+                tname_step = "agent_step"
+                raw_a = sname if sname else None
+            ns = make_step(
+                len(norm_steps),
+                tool_name=tname_step,
+                raw_args=raw_a,
+                obs=obs_str,
+                assistant_text=assistant_txt,
+                msg_chars_override=len(assistant_txt) + len(sname),
+                obs_chars_override=len(obs_str),
+            )
+            norm_steps.append(ns)
+
+    if pending_text_parts:
+        trailing = "\n".join(pending_text_parts)
+        norm_steps.append(
+            make_step(
+                len(norm_steps),
+                tool_name=None,
+                raw_args=None,
+                obs=None,
+                assistant_text=trailing,
+                msg_chars_override=len(trailing),
+                obs_chars_override=0,
+            )
+        )
+
+    rep_cost, uncached_in, cached_in, out_tok, total_in, aux_tok = _extract_swe_tokens(rec)
+    comp_reason = detect_compaction_or_subagents(
+        norm_steps,
+        extra_texts=extra_texts,
+        aux_models_tokens=aux_tok,
+        has_multiple_prompts=has_multi_prompts,
+    )
+    csource = "reported_usd_rebuilt" if rep_cost is not None else "tokens_rebuilt_list_rates"
+
+    return _analyze_single_trajectory(
+        dataset=dataset,
+        run_id=traj_id,
+        harness=harness,
+        model=model,
+        task_name=task_name,
+        succeeded=succeeded,
+        steps=norm_steps,
+        initial_prompt_chars=init_chars,
+        reported_cost_usd=rep_cost,
+        reported_uncached_in=uncached_in,
+        reported_cached_in=cached_in,
+        reported_out=out_tok,
+        reported_total_in=total_in,
+        disable_cache_discount=(cached_in == 0.0),
+        compaction_reason=comp_reason,
+        has_rsc=False,
+        graded=graded,
+        context_limit_tokens=context_limit_tokens,
+        cost_source=csource,
+        cohort=cohort,
+    )
+
+
 def _process_swe_shard(sh: Path) -> tuple[list[CompactRunRecord], dict[str, int]]:
     records: list[CompactRunRecord] = []
     counts = Counter()
@@ -435,140 +620,17 @@ def _process_swe_shard(sh: Path) -> tuple[list[CompactRunRecord], dict[str, int]
             rec = orjson.loads(line)
             part = rec["participant"]
             harness = part["key"]
-            model = part["model"]
-            task_name = rec["instance_id"]
-            traj_id = rec["trajectory_id"]
-            succeeded = bool(rec["evaluation"]["resolved"])
-
-            events = rec.get("events") or []
-            init_chars = 0
-            has_multi_prompts = False
-            extra_texts: list[str] = []
-            tool_results_by_id: dict[str, dict[str, Any]] = {}
-            for ev in events:
-                if ev.get("type") == "tool_result" and ev.get("tool_call_id"):
-                    tool_results_by_id[ev["tool_call_id"]] = ev
-
-            norm_steps: list[NormalizedStep] = []
-            pending_text_parts: list[str] = []
-
-            for ev in events:
-                et = ev.get("type")
-                if et == "prompt":
-                    msgs = ev.get("messages") or []
-                    pchars = sum(len(str(m.get("content") or "")) for m in msgs)
-                    if ev.get("seq", 0) == 0:
-                        init_chars += pchars
-                    else:
-                        has_multi_prompts = True
-                    for m in msgs:
-                        extra_texts.append(str(m.get("content") or ""))
-                elif et in ("assistant_message", "assistant_analysis", "final_message"):
-                    c = ev.get("content")
-                    if isinstance(c, str) and c:
-                        pending_text_parts.append(c)
-                    elif c is not None:
-                        pending_text_parts.append(str(c))
-                elif et == "tool_call":
-                    tc_id = ev.get("tool_call_id") or ""
-                    tr = tool_results_by_id.get(tc_id)
-                    obs_raw = tr.get("content") if tr else None
-                    obs_str = (
-                        obs_raw
-                        if isinstance(obs_raw, str)
-                        else ("" if obs_raw is None else orjson.dumps(obs_raw).decode("utf-8", errors="replace"))
-                    )
-                    orig_bytes = tr.get("content_bytes_original") if tr else None
-                    obs_chars = max(len(obs_str), int(orig_bytes or 0))
-                    assistant_txt = "\n".join(pending_text_parts)
-                    pending_text_parts.clear()
-
-                    tname = ev.get("tool") or "unknown"
-                    inp = ev.get("input")
-                    inp_len = len(orjson.dumps(inp)) if inp is not None else 0
-                    ns = make_step(
-                        len(norm_steps),
-                        tool_name=tname,
-                        raw_args=inp,
-                        obs=obs_str,
-                        assistant_text=assistant_txt,
-                        status=tr.get("status") if tr else None,
-                        exit_code=tr.get("exit_code") if tr else None,
-                        error_field=tr.get("error") if tr else None,
-                        is_tb_coarse_schema=False,
-                        msg_chars_override=len(assistant_txt) + len(tname) + inp_len,
-                        obs_chars_override=obs_chars,
-                    )
-                    norm_steps.append(ns)
-                elif et == "agent_step":
-                    assistant_txt = "\n".join(pending_text_parts)
-                    pending_text_parts.clear()
-                    sname = (ev.get("name") or "").strip()
-                    scontent = ev.get("content")
-                    obs_str = scontent if isinstance(scontent, str) else str(scontent or "")
-                    first_line = obs_str.splitlines()[0].strip() if obs_str else ""
-                    if sname in ("Opened file", "Open file"):
-                        tname_step = "read"
-                        raw_a: Any = {"file_path": first_line} if first_line else None
-                    elif sname in ("Edited files", "Edited file"):
-                        tname_step = "edit"
-                        raw_a = None  # junie summary omits diff/path details; file_op becomes write_any
-                    elif sname in ("Fetch URL", "Read skill", "Web search"):
-                        tname_step = sname.lower().replace(" ", "_")
-                        raw_a = first_line if first_line else None
-                    else:
-                        tname_step = "agent_step"
-                        raw_a = sname if sname else None
-                    ns = make_step(
-                        len(norm_steps),
-                        tool_name=tname_step,
-                        raw_args=raw_a,
-                        obs=obs_str,
-                        assistant_text=assistant_txt,
-                        msg_chars_override=len(assistant_txt) + len(sname),
-                        obs_chars_override=len(obs_str),
-                    )
-                    norm_steps.append(ns)
-
-            if pending_text_parts:
-                trailing = "\n".join(pending_text_parts)
-                norm_steps.append(
-                    make_step(
-                        len(norm_steps),
-                        tool_name=None,
-                        raw_args=None,
-                        obs=None,
-                        assistant_text=trailing,
-                        msg_chars_override=len(trailing),
-                        obs_chars_override=0,
-                    )
-                )
-
-            rep_cost, uncached_in, cached_in, out_tok, total_in, aux_tok = _extract_swe_tokens(rec)
-            comp_reason = detect_compaction_or_subagents(
-                norm_steps,
-                extra_texts=extra_texts,
-                aux_models_tokens=aux_tok,
-                has_multiple_prompts=has_multi_prompts,
-            )
-
-            out_rec = _analyze_single_trajectory(
+            ptype = part.get("type") or ""
+            cohort = "swe_rebench_swelike" if ptype == "common_scaffold_model" else "swe_rebench_agentic"
+            out_rec = _parse_swe_style_trajectory(
+                rec,
                 dataset="swe_rebench",
-                run_id=traj_id,
                 harness=harness,
-                model=model,
-                task_name=task_name,
-                succeeded=succeeded,
-                steps=norm_steps,
-                initial_prompt_chars=init_chars,
-                reported_cost_usd=rep_cost,
-                reported_uncached_in=uncached_in,
-                reported_cached_in=cached_in,
-                reported_out=out_tok,
-                reported_total_in=total_in,
-                disable_cache_discount=(cached_in == 0.0),
-                compaction_reason=comp_reason,
-                has_rsc=False,
+                model=part["model"],
+                task_name=rec["instance_id"],
+                traj_id=rec["trajectory_id"],
+                succeeded=bool(rec["evaluation"]["resolved"]),
+                cohort=cohort,
             )
             records.append(out_rec)
             if out_rec.cost_included:
@@ -594,6 +656,265 @@ def analyze_swe_rebench(data_dir: Path) -> tuple[list[CompactRunRecord], dict[st
             total_counts.update(cnts)
 
     records.sort(key=lambda r: (r.harness, r.model, r.task_name, r.run_id))
+    return records, dict(total_counts)
+
+
+def _process_longtail_shard(pf_path: Path) -> tuple[list[CompactRunRecord], dict[str, int]]:
+    records: list[CompactRunRecord] = []
+    counts = Counter()
+    rows = pq.read_table(
+        pf_path,
+        columns=[
+            "trajectory_id",
+            "instance_id",
+            "canonical_model",
+            "scaffold",
+            "resolved",
+            "effective_context_tokens",
+            "trajectory",
+        ],
+    ).to_pylist()
+    for row in rows:
+        counts["total_rows"] += 1
+        traj = orjson.loads(row["trajectory"])
+        graded = row["resolved"] is not None
+        succeeded = bool(row["resolved"] == 1) if graded else False
+        ctx_tok = int(row["effective_context_tokens"]) if row.get("effective_context_tokens") else None
+        out_rec = _parse_swe_style_trajectory(
+            traj,
+            dataset="longtail_swe",
+            harness=str(row["scaffold"] or "swelike"),
+            model=str(row["canonical_model"]),
+            task_name=str(row["instance_id"]),
+            traj_id=str(row["trajectory_id"]),
+            succeeded=succeeded,
+            graded=graded,
+            context_limit_tokens=ctx_tok,
+            cohort="longtail_swe_swelike",
+        )
+        if out_rec.n_steps == 0:
+            counts["zero_step_runs"] += 1
+        records.append(out_rec)
+        if out_rec.cost_included:
+            counts["cost_included"] += 1
+        else:
+            counts[f"cost_dropped_{out_rec.drop_reason}"] += 1
+    return records, dict(counts)
+
+
+def analyze_longtail_swe(data_dir: Path) -> tuple[list[CompactRunRecord], dict[str, int]]:
+    """Load and analyze all Longtail-SWE trajectories across parallel workers."""
+    parquets = sorted((data_dir / "longtail_swe" / "data").glob("*.parquet"))
+    if not parquets:
+        raise FileNotFoundError(f"No parquet files found under {data_dir / 'longtail_swe' / 'data'}")
+
+    records: list[CompactRunRecord] = []
+    total_counts = Counter()
+    workers = min(6, max(1, (os.cpu_count() or 4) - 1))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        for recs, cnts in ex.map(_process_longtail_shard, parquets):
+            records.extend(recs)
+            total_counts.update(cnts)
+
+    records.sort(key=lambda r: (r.model, r.task_name, r.run_id))
+    return records, dict(total_counts)
+
+
+def _process_sierra_submission_dir(sub_dir: Path) -> tuple[list[CompactRunRecord], dict[str, int]]:
+    records: list[CompactRunRecord] = []
+    counts = Counter()
+    model_slug = sub_dir.name.split("_sierra_")[0]
+    tdir = sub_dir / "trajectories"
+    if not tdir.exists():
+        return records, dict(counts)
+
+    domain_dirs = sorted(d for d in tdir.iterdir() if d.is_dir())
+    if not domain_dirs:
+        return records, dict(counts)
+
+    pricing = get_model_pricing(model_slug, disable_cache_discount=False)
+
+    for d in domain_dirs:
+        domain = d.name
+        rf = d / "results.json"
+        info = orjson.loads(rf.read_bytes()).get("info", {}) if rf.exists() else {}
+        user_llm = str((info.get("user_info") or {}).get("llm") or "")
+        litellm_llm = str((info.get("agent_info") or {}).get("llm") or "")
+        rcfg = str(info.get("retrieval_config") or "")
+
+        if domain in {"airline", "retail", "telecom"}:
+            if user_llm != "gpt-5.2":
+                counts["skipped_non_gpt52_user_sim"] += 1
+                continue
+            cohort = "tau2_classic"
+            harness = "tau2_classic"
+        elif domain == "banking_knowledge":
+            if user_llm != "gpt-5.2":
+                counts["skipped_non_gpt52_user_sim"] += 1
+                continue
+            if rcfg.lower() == "alltools":
+                cohort = "tau2_banking_knowledge_alltools"
+                harness = "tau2_bk_alltools"
+            else:
+                cohort = f"tau2_bk_{rcfg.lower() or 'other'}"
+                harness = cohort
+        else:
+            cohort = f"tau2_{domain}"
+            harness = cohort
+
+        for sp in sorted((d / "simulations").glob("*.json")):
+            counts["total_rows"] += 1
+            sim = orjson.loads(sp.read_bytes())
+            raw_tid = str(sim.get("task_id") or "")
+            task_name = f"{domain}::{raw_tid}" if domain != "banking_knowledge" else raw_tid
+            reward = float(((sim.get("reward_info") or {}).get("reward")) or 0.0)
+            succeeded = reward >= 0.999
+            sim_id = str(sim.get("id") or sp.stem)
+
+            msgs = sim.get("messages") or []
+            tool_res_by_id: dict[str, dict[str, Any]] = {
+                m["id"]: m for m in msgs if m.get("role") == "tool" and m.get("id")
+            }
+
+            norm_steps: list[NormalizedStep] = []
+            step_costs: list[float] = []
+            extra_texts: list[str] = []
+            has_any_reported_turn_cost = False
+            has_any_usage_tokens = False
+
+            for idx_m, m in enumerate(msgs):
+                role = m.get("role")
+                if role == "user":
+                    if m.get("content"):
+                        extra_texts.append(str(m.get("content")))
+                    continue
+                if role != "assistant":
+                    continue
+
+                tcs = m.get("tool_calls") or []
+                usage = m.get("usage") if isinstance(m.get("usage"), dict) else {}
+                pt = float(usage.get("prompt_tokens") or 0.0)
+                ct = float(usage.get("completion_tokens") or 0.0)
+                raw_m_cost = m.get("cost")
+                if pt > 0 or ct > 0:
+                    has_any_usage_tokens = True
+
+                if _is_finite_pos(raw_m_cost):
+                    turn_cost = float(raw_m_cost)
+                    has_any_reported_turn_cost = True
+                elif pt > 0 or ct > 0:
+                    turn_cost = (pt * pricing.input_per_m + ct * pricing.output_per_m) / 1e6
+                else:
+                    turn_cost = 0.0
+
+                asst_txt = m.get("content") or ""
+                if not isinstance(asst_txt, str):
+                    asst_txt = str(asst_txt)
+
+                if tcs:
+                    per_step_cost = turn_cost / len(tcs)
+                    for tc_idx, tc in enumerate(tcs):
+                        tc_id = tc.get("id") or ""
+                        tr = tool_res_by_id.get(tc_id, {})
+                        obs = tr.get("content")
+                        err_flag = bool(tr.get("error"))
+                        ns = make_step(
+                            len(norm_steps),
+                            tool_name=tc.get("name") or "unknown",
+                            raw_args=tc.get("arguments"),
+                            obs=obs if isinstance(obs, str) else str(obs or ""),
+                            assistant_text=asst_txt if tc_idx == 0 else "",
+                            status="error" if err_flag else "success",
+                            error_field="error" if err_flag else None,
+                        )
+                        norm_steps.append(ns)
+                        step_costs.append(per_step_cost)
+                else:
+                    # Non-tool assistant turn talking to simulated user
+                    next_obs = ""
+                    for nxt in msgs[idx_m + 1 :]:
+                        if nxt.get("role") == "user":
+                            next_obs = str(nxt.get("content") or "")
+                            break
+                        if nxt.get("role") == "assistant":
+                            break
+                    if not asst_txt.strip() and not next_obs.strip():
+                        continue
+                    ns = make_step(
+                        len(norm_steps),
+                        tool_name=None,
+                        raw_args=None,
+                        obs=next_obs,
+                        assistant_text=asst_txt,
+                    )
+                    norm_steps.append(ns)
+                    step_costs.append(turn_cost)
+
+            comp_reason = detect_compaction_or_subagents(norm_steps, extra_texts=extra_texts)
+            if not norm_steps:
+                counts["zero_step_runs"] += 1
+                csource = None
+                sc_override = None
+            elif has_any_reported_turn_cost:
+                csource = "reported_provider_usd"
+                sc_override = step_costs
+            elif has_any_usage_tokens:
+                csource = "rebuilt_from_turn_tokens_uncached"
+                sc_override = step_costs
+            else:
+                csource = None
+                sc_override = None
+
+            out_rec = _analyze_single_trajectory(
+                dataset="sierra_tau2",
+                run_id=f"{domain}:{sim_id}",
+                harness=harness,
+                model=model_slug,
+                task_name=task_name,
+                succeeded=succeeded,
+                steps=norm_steps,
+                initial_prompt_chars=0,
+                reported_cost_usd=None,
+                reported_uncached_in=None,
+                reported_cached_in=None,
+                reported_out=None,
+                reported_total_in=None,
+                disable_cache_discount=False,
+                compaction_reason=comp_reason,
+                has_rsc=False,
+                cost_source=csource,
+                litellm_llm=litellm_llm,
+                cohort=cohort,
+                retrieval_config=rcfg or None,
+                step_costs_override=sc_override,
+            )
+            records.append(out_rec)
+            if out_rec.cost_included:
+                counts["cost_included"] += 1
+            else:
+                counts[f"cost_dropped_{out_rec.drop_reason}"] += 1
+
+    return records, dict(counts)
+
+
+def analyze_sierra_tau2(data_dir: Path) -> tuple[list[CompactRunRecord], dict[str, int]]:
+    """Load and analyze all non-voice Sierra tau2-bench public S3 submissions."""
+    root = data_dir / "sierra_tau2_public"
+    if not root.exists():
+        return [], {}
+    sub_dirs = sorted(p for p in root.iterdir() if p.is_dir())
+    if not sub_dirs:
+        return [], {}
+
+    records: list[CompactRunRecord] = []
+    total_counts = Counter()
+    workers = min(6, max(1, (os.cpu_count() or 4) - 1))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        for recs, cnts in ex.map(_process_sierra_submission_dir, sub_dirs):
+            records.extend(recs)
+            total_counts.update(cnts)
+
+    records.sort(key=lambda r: (r.cohort or "", r.model, r.task_name, r.run_id))
     return records, dict(total_counts)
 
 

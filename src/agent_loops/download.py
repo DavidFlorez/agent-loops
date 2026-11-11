@@ -24,6 +24,35 @@ TAU2_CONTENTS_API = (
 DEFAULT_DATA_DIR = Path("data")
 
 _VOICE_TOKENS = ("voice", "nova", "gpt-realtime", "native-audio")
+_PREREGISTERED_SIERRA_SUBS = frozenset({
+    "claude-fable-5_sierra_2026-08-04",
+    "claude-opus-4-5_sierra_2026-02-26",
+    "claude-opus-4-6_sierra_2026-05-05",
+    "claude-opus-4-7_sierra_2026-05-05",
+    "claude-opus-4-8_sierra_2026-08-04",
+    "claude-opus-5_sierra_2026-08-04",
+    "claude-sonnet-4-5_sierra_2026-02-26",
+    "gemini-2-5-pro_sierra_2026-05-05",
+    "gemini-3-1-pro-preview_sierra_2026-05-05",
+    "gemini-3-flash_sierra_2026-03-02",
+    "gemini-3-pro_sierra_2026-03-02",
+    "glm-5-2_sierra_2026-08-04",
+    "glm-5-think_sierra_2026-03-02",
+    "gpt-5-2-none_sierra_2026-02-26",
+    "gpt-5-2_sierra_2026-02-26",
+    "gpt-5-4_sierra_2026-03-25",
+    "gpt-5-5_sierra_2026-05-05",
+    "gpt-5-6-sol_sierra_2026-08-04",
+    "gpt-5_sierra_2025-08-09",
+    "grok-4-1-fast_sierra_2026-05-05",
+    "grok-4-2_sierra_2026-05-05",
+    "grok-4-5_sierra_2026-08-04",
+    "grok-4-fast_sierra_2026-05-05",
+    "inkling_sierra_2026-08-04",
+    "kimi-k3_sierra_2026-08-04",
+    "qwen3-8-max_sierra_2026-08-04",
+    "qwen3.5-397b-a17b-think_sierra_2026-03-02",
+})
 
 
 def download_terminalbench(data_dir: Path = DEFAULT_DATA_DIR) -> Path:
@@ -113,6 +142,10 @@ def _list_s3_keys(prefix: str) -> list[str]:
 
 def download_sierra_tau2_public(data_dir: Path = DEFAULT_DATA_DIR) -> Path:
     """Cache non-voice _sierra_ submissions from s3://sierra-tau-bench-public/submissions/."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
     target = data_dir / "sierra_tau2_public"
     existing = sorted(p for p in target.iterdir() if p.is_dir()) if target.exists() else []
     if len(existing) >= 27 and all((p / "submission.json").exists() for p in existing):
@@ -131,15 +164,13 @@ def download_sierra_tau2_public(data_dir: Path = DEFAULT_DATA_DIR) -> Path:
         if len(parts) < 3:
             continue
         sub_name = parts[1]
-        if "_sierra_" not in sub_name:
-            continue
-        low = sub_name.lower()
-        if any(vt in low for vt in _VOICE_TOKENS):
+        if sub_name not in _PREREGISTERED_SIERRA_SUBS:
             continue
         if k.endswith(".wav") or "/audio/" in k:
             continue
         by_sub[sub_name].append(k)
 
+    tasks: list[tuple[str, Path]] = []
     for sub_name, keys in sorted(by_sub.items()):
         has_sim_dirs = any("/simulations/" in k for k in keys)
         for k in keys:
@@ -151,13 +182,32 @@ def download_sierra_tau2_public(data_dir: Path = DEFAULT_DATA_DIR) -> Path:
             if dest.exists() and dest.stat().st_size > 0:
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
-            url = f"{SIERRA_S3_URL}/{k}"
-            with requests.get(url, stream=True, timeout=120) as r:
+            tasks.append((f"{SIERRA_S3_URL}/{k}", dest))
+
+    if tasks:
+        print(f"[downloading] {len(tasks):,} Sierra S3 files across 32 threads...")
+        session = requests.Session()
+        retry = Retry(
+            total=5,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+        )
+        adapter = HTTPAdapter(pool_connections=32, pool_maxsize=32, max_retries=retry)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+
+        def _fetch_one(item: tuple[str, Path]) -> None:
+            url, dest = item
+            with session.get(url, timeout=120) as r:
                 r.raise_for_status()
-                with dest.open("wb") as out:
-                    for chunk in r.iter_content(chunk_size=1024 * 1024):
-                        if chunk:
-                            out.write(chunk)
+                dest.write_bytes(r.content)
+
+        with ThreadPoolExecutor(max_workers=32) as ex:
+            futs = [ex.submit(_fetch_one, t) for t in tasks]
+            for fut in as_completed(futs):
+                fut.result()
+
     return target
 
 
@@ -384,7 +434,7 @@ def inspect_schemas(data_dir: Path = DEFAULT_DATA_DIR) -> dict[str, Any]:
             print("simulation JSON keys:", list(sim_obj.keys()))
             print(
                 "message keys union (sample):",
-                sorted({k for m in sim_obj.get("messages", []) for k in m.keys()}),
+                sorted({k for m in (sim_obj.get("messages") or []) for k in m.keys()}),
             )
 
         print("Sierra submission inventory (cohort | retrieval_config | user_sim | sims | tok | cost>0):")
@@ -406,7 +456,7 @@ def inspect_schemas(data_dir: Path = DEFAULT_DATA_DIR) -> dict[str, Any]:
                         if any(
                             isinstance(m.get("usage"), dict)
                             and ((m["usage"].get("prompt_tokens") or 0) > 0 or (m["usage"].get("completion_tokens") or 0) > 0)
-                            for m in s.get("messages", [])
+                            for m in (s.get("messages") or [])
                             if m.get("role") == "assistant"
                         ):
                             tok_c += 1

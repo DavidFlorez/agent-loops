@@ -108,6 +108,9 @@ def write_results_and_summary(
     tau2_summary: dict[str, Any],
     loop_prone_tasks: pd.DataFrame,
     timings_sec: dict[str, float],
+    longtail_counts: dict[str, int] | None = None,
+    sierra_counts: dict[str, int] | None = None,
+    fair_study_results: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Write all CSV/JSON artifacts and programmatically generate results/summary.md."""
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -132,6 +135,34 @@ def write_results_and_summary(
     tb_no_rsc = [r for r in tb_records if not r.has_rsc_ref]
     tb_no_rsc_head = _corpus_headline(tb_no_rsc, {"note": "zero-RSC-pointer subset"})
 
+    phase2_meta: dict[str, Any] = {}
+    if fair_study_results is not None:
+        mres = fair_study_results.get("matching", {})
+        reg = fair_study_results.get("regressions", {})
+        phase2_meta = {
+            "longtail_counts": longtail_counts or {},
+            "sierra_counts": sierra_counts or {},
+            "cohorts": {
+                c: {
+                    "n_open_models": mres[c]["n_open_models"],
+                    "n_closed_models": mres[c]["n_closed_models"],
+                    "n_open_runs": mres[c]["n_open_runs"],
+                    "n_closed_runs": mres[c]["n_closed_runs"],
+                    "unmatched_loops_per_100_diff": mres[c]["loops_per_100_steps"]["unmatched_diff"],
+                    "matched_loops_per_100_diff": mres[c]["loops_per_100_steps"]["matched_diff"],
+                    "matched_loops_per_100_ci": mres[c]["loops_per_100_steps"]["matched_diff_ci"],
+                    "overlap_bands": mres[c]["loops_per_100_steps"]["overlap_bands"],
+                    "matched_any_loop_diff": mres[c]["any_loop_rate"]["matched_diff"],
+                }
+                for c in mres
+            },
+            "pooled_within_scaffold": {
+                k: v
+                for k, v in (reg.get("pooled_within_scaffold") or {}).items()
+                if k in ("negbin_offset", "logit", "logit_with_steps", "gee_poisson_task", "glmm_binomial_random_task")
+            },
+        }
+
     metrics = {
         "pre_registered_rebuild_ratio_bounds": [REBUILD_MIN_RATIO, REBUILD_MAX_RATIO],
         "terminalbench": tb_head,
@@ -140,9 +171,10 @@ def write_results_and_summary(
         "swe_rebench": swe_head,
         "swe_rebench_turn_budgets": swe_budgets,
         "tau2_bench": tau2_summary,
+        "phase2_open_vs_closed": phase2_meta,
         "timings_sec": timings_sec,
     }
-    (results_dir / "study_metrics.json").write_text(json.dumps(metrics, indent=2))
+    (results_dir / "study_metrics.json").write_text(json.dumps(metrics, indent=2, default=str))
 
     # Build summary.md purely from computed numbers
     md: list[str] = []
@@ -293,6 +325,37 @@ def write_results_and_summary(
         f"- Pass rate: looping {_fmt_pct(tau2_summary.get('pass_rate_looping', 0.0))} vs "
         f"loop-free {_fmt_pct(tau2_summary.get('pass_rate_loop_free', 0.0))}.\n"
     )
+
+    if fair_study_results is not None:
+        mres = fair_study_results.get("matching", {})
+        reg = fair_study_results.get("regressions", {})
+        md.append("## 8. Phase 2 Fair Open-Weights vs Closed Comparison (Within-Scaffold, Common Tasks)\n")
+        md.append(
+            "See [`results/open_vs_closed_model.md`](open_vs_closed_model.md), "
+            "[`results/loops_by_model_scaffold.csv`](loops_by_model_scaffold.csv), and `../ARTICLE_DRAFT.md`.\n"
+        )
+        md.append(
+            "| Cohort | Unmatched Gap Loops/100 [95% CI] | Overlap Bands | Matched Gap Loops/100 [95% CI] | NB Offset Adj IRR (p_2way) |"
+        )
+        md.append("| --- | ---: | ---: | ---: | ---: |")
+        for cname, entry in mres.items():
+            lp = entry["loops_per_100_steps"]
+            u_s = f"{lp['unmatched_diff']:+.2f} [{lp['unmatched_diff_ci'][0]:+.2f}, {lp['unmatched_diff_ci'][1]:+.2f}]"
+            if lp["overlap_bands"] > 0 and pd.notna(lp["matched_diff"]):
+                m_s = f"{lp['matched_diff']:+.2f} [{lp['matched_diff_ci'][0]:+.2f}, {lp['matched_diff_ci'][1]:+.2f}]"
+            else:
+                m_s = "no band overlap"
+            nb_c = ((reg.get(cname) or {}).get("negbin_offset") or {}).get("coefs", {}).get("is_open_weight")
+            nb_s = f"{nb_c['irr_or']:.2f} ({nb_c['p']:.4f})" if nb_c else "n/a"
+            md.append(f"| `{cname}` | {u_s} | {lp['overlap_bands']} | {m_s} | {nb_s} |")
+        pool_nb = ((reg.get("pooled_within_scaffold") or {}).get("negbin_offset") or {}).get("coefs", {}).get("is_open_weight")
+        pool_lg = ((reg.get("pooled_within_scaffold") or {}).get("logit") or {}).get("coefs", {}).get("is_open_weight")
+        if pool_nb and pool_lg:
+            md.append(
+                f"\n- **Pooled within-scaffold regression**: `is_open_weight` NB `log(steps)`-offset IRR = "
+                f"**{pool_nb['irr_or']:.2f}** (`[{pool_nb['ci_low']:.2f}, {pool_nb['ci_high']:.2f}]`, `p={pool_nb['p']:.4f}`); "
+                f"Logit OR = **{pool_lg['irr_or']:.2f}** (`[{pool_lg['ci_low']:.2f}, {pool_lg['ci_high']:.2f}]`, `p={pool_lg['p']:.4f}`).\n"
+            )
 
     summary_text = "\n".join(md)
     (results_dir / "summary.md").write_text(summary_text)

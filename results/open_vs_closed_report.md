@@ -18,12 +18,12 @@ Generated programmatically from cached public trajectories (`yoonholee/terminalb
 | TB All Trials (incl. null steps) — **Closed** | 38,205 | 44.57% | n/a | n/a | n/a | n/a | n/a | n/a |
 | TB With Steps — **Open-Weights** | 11,943 | 24.83% | 4,569 (38.26%) | 9.78% | 35.0 / 81 | 4,211 | $0.70 | 15.61% |
 | TB With Steps — **Closed** | 22,519 | 36.03% | 6,115 (27.15%) | 5.85% | 29.2 / 64 | 800 | $0.47 | 34.11% |
-| SWE-rebench (`swelike` controlled) — **Open-Weights (7)** | 3,885 | 38.53% | 3,470 (89.32%) | 5.66% | 94.7 / 167 | 3,652 | $0.49 | 4.44% |
-| SWE-rebench (`swelike` controlled) — **Closed (6)** | 3,330 | 59.07% | 1,000 (30.03%) | 1.14% | 45.4 / 89 | 2,440 | $1.24 | 1.15% |
-| SWE-rebench (`agentic_system` 4 harnesses) — **Closed** | 2,220 | 57.97% | 718 (32.34%) | 3.05% | 50.7 / 92 | 289 | $0.43 | 2.80% |
-| SWE-rebench (All 17) — **Closed (10)** | 5,550 | 58.63% | 1,718 (30.95%) | 1.95% | 47.5 / 90 | 2,729 | $1.15 | 1.22% |
+| SWE-rebench (`swelike` controlled) — **Open-Weights (7)** | 3,885 | 38.53% | 3,470 (89.32%) | 5.66% | 94.7 / 167 | 3,652 | $0.59 | 4.75% |
+| SWE-rebench (`swelike` controlled) — **Closed (6)** | 3,330 | 59.07% | 1,000 (30.03%) | 1.14% | 45.4 / 89 | 2,440 | $1.51 | 1.11% |
+| SWE-rebench (`agentic_system` 4 harnesses) — **Closed** | 2,220 | 57.97% | 718 (32.34%) | 3.05% | 50.7 / 92 | 752 | $2.21 | 4.32% |
+| SWE-rebench (All 17) — **Closed (10)** | 5,550 | 58.63% | 1,718 (30.95%) | 1.95% | 47.5 / 90 | 3,192 | $1.67 | 2.10% |
 
-> **Methodological note on Terminal-Bench Closed cost share (`34.11%`)**: Only `800 / 22,519` Closed TB runs survived the `[0.50x, 2.00x]` cost-rebuild validation (newer Gemini-3, GPT-5.2, and RSC-pointer runs had `cost_cents=0` or missing tokens), leaving an older subset dominated by `claude-opus-4-1` and `gemini-2.5-flash`. On SWE-rebench (`swelike` controlled), where both cohorts have high cost coverage (`3,652` Open vs `2,440` Closed), Open models spend **4.44%** of dollars on loops vs **1.15%** for Closed.
+> **Methodological note on Terminal-Bench Closed cost share (`34.11%`)**: Only `800 / 22,519` Closed TB runs survived the `[0.50x, 2.00x]` cost-rebuild validation (newer Gemini-3, GPT-5.2, and RSC-pointer runs had `cost_cents=0` or missing tokens), leaving an older subset dominated by `claude-opus-4-1` and `gemini-2.5-flash`. On SWE-rebench (`swelike` controlled), where both cohorts have high cost coverage (`3,652` Open vs `2,440` Closed), Open models spend **4.75%** of dollars on loops vs **1.11%** for Closed.
 
 ## 3. Controlled Same-Harness Comparisons (Eliminating Scaffold Confounding)
 
@@ -65,20 +65,20 @@ Generated programmatically from cached public trajectories (`yoonholee/terminalb
 
 | Participant | Model | Weights | Scaffold | Pass Rate | Loop Runs (%) | Loop Step Share | Cost/Run | Loop $ Share | Rotations |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `fable-5` | `claude-fable-5` | Closed | `swelike` | 64.50% | 25.41% | 0.71% | $1.00 | 0.87% | 0 |
+| `fable-5` | `claude-fable-5` | Closed | `swelike` | 64.50% | 25.41% | 0.71% | $3.33 | 0.87% | 0 |
 | `grok-4.5` | `x-ai/grok-4.5` | Closed | `swelike` | 63.78% | 23.24% | 0.65% | $2.28 | 0.82% | 0 |
 | `opus-5` | `claude-opus-5` | Closed | `swelike` | 63.42% | 37.84% | 1.12% | $2.81 | 1.06% | 0 |
 | `glm-5.2` | `z-ai/glm-5.2` | Open | `swelike` | 62.88% | 61.08% | 1.72% | $1.19 | 1.40% | 47 |
 | `gpt-5.6-sol` | `gpt-5.6-sol` | Closed | `swelike` | 62.34% | 13.87% | 0.85% | $0.31 | 0.73% | 0 |
 | `junie` | `grok-4.5` | Closed | `agentic_system` | 61.80% | 15.68% | 0.38% | n/a | n/a | 0 |
-| `claude-code` | `fable-5` | Closed | `agentic_system` | 60.36% | 31.89% | 6.41% | n/a | n/a | 0 |
+| `claude-code` | `fable-5` | Closed | `agentic_system` | 60.36% | 31.89% | 6.41% | $3.32 | 4.44% | 0 |
 | `codex` | `gpt-5.6-sol` | Closed | `agentic_system` | 58.02% | 20.54% | 2.24% | $0.64 | 2.27% | 1 |
 | `sonnet-5` | `claude-sonnet-5` | Closed | `swelike` | 56.76% | 70.81% | 1.96% | $1.51 | 2.79% | 0 |
 | `cursor` | `composer-2.5` | Closed | `agentic_system` | 51.71% | 61.26% | 2.75% | $0.25 | 3.90% | 0 |
-| `minimax-m3` | `minimax/minimax-m3` | Open | `swelike` | 47.21% | 99.28% | 5.95% | $0.54 | 7.60% | 5 |
-| `mimo-v2.5-pro` | `xiaomi/mimo-v2.5-pro` | Open | `swelike` | 46.49% | 90.09% | 4.52% | $0.31 | 5.02% | 8 |
-| `gpt-5.6-luna` | `gpt-5.6-luna` | Closed | `swelike` | 43.60% | 9.01% | 0.57% | $0.05 | 0.57% | 0 |
-| `deepseek-v4-pro` | `deepseek/deepseek-v4-pro` | Open | `swelike` | 40.18% | 85.41% | 4.49% | $0.40 | 4.30% | 41 |
+| `minimax-m3` | `minimax/minimax-m3` | Open | `swelike` | 47.21% | 99.28% | 5.95% | $0.94 | 7.90% | 5 |
+| `mimo-v2.5-pro` | `xiaomi/mimo-v2.5-pro` | Open | `swelike` | 46.49% | 90.09% | 4.52% | $0.09 | 3.94% | 8 |
+| `gpt-5.6-luna` | `gpt-5.6-luna` | Closed | `swelike` | 43.60% | 9.01% | 0.57% | $0.02 | 0.55% | 0 |
+| `deepseek-v4-pro` | `deepseek/deepseek-v4-pro` | Open | `swelike` | 40.18% | 85.41% | 4.49% | $0.92 | 4.30% | 41 |
 | `qwen3.6-27b` | `Qwen/Qwen3.6-27B` | Open | `swelike` | 31.17% | 95.68% | 6.84% | $0.24 | 4.88% | 3 |
 | `qwen3.6-35b-a3b` | `Qwen/Qwen3.6-35B-A3B` | Open | `swelike` | 24.68% | 96.58% | 8.46% | $0.23 | 7.72% | 9 |
 | `qwen3.5-35b-a3b` | `Qwen/Qwen3.5-35B-A3B` | Open | `swelike` | 17.12% | 97.12% | 7.98% | $0.51 | 6.24% | 6 |

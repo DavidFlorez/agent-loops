@@ -9,8 +9,8 @@ All numbers below are generated programmatically from cached public trajectory d
 | Trajectories analyzed (with steps) | 34,462 | 5,371 | 9,435 |
 | Runs with any loop | 10,684 (31.00%) | 2,253 (41.95%) | 5,188 (54.99%) |
 | Loop share of steps | 7.38% (79,344/1,075,547) | 12.31% | 4.11% (25,975/631,803) |
-| Cost-validated runs | 5,011 | 3,787 | 6,381 |
-| Loop share of cache-aware dollars | 17.71% ($589.76 / $3,330.95) | 14.94% | 2.38% ($117.38 / $4,927.87) |
+| Cost-validated runs | 5,011 | 3,787 | 6,844 |
+| Loop share of cache-aware dollars | 17.71% ($589.76 / $3,330.95) | 14.94% | 2.87% ($215.10 / $7,506.20) |
 | Pass rate: looping runs | 27.42% | 19.22% | 43.14% |
 | Pass rate: loop-free runs | 34.27% | 24.47% | 59.17% |
 | Productive repeat step share (excluded from loops) | 5.54% | 9.82% | 1.90% |
@@ -42,9 +42,9 @@ All numbers below are generated programmatically from cached public trajectory d
 
 ### SWE-rebench July 2026
 - `cost_dropped_missing_reported_cost_and_tokens`: 6
-- `cost_dropped_rebuild_mismatch`: 2,494
+- `cost_dropped_rebuild_mismatch`: 2,031
 - `cost_dropped_subagents`: 554
-- `cost_included`: 6,381
+- `cost_included`: 6,844
 - `total_rows`: 9,435
 
 ## 4. Detector Replay vs Matched-Random Baseline (200 Seeds)
@@ -67,17 +67,17 @@ All numbers below are generated programmatically from cached public trajectory d
 ### SWE-rebench July 2026
 | Detector | Firing Rate | Dollars Saved | False-Stop Rate | Matched-Rand FSR (95% CI) | Matched-Rand Saved (95% CI) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `cline_style` | 0.37% (35) | 0.29% ($14.38) | 37.14% | 46.19% [34.21%, 60.00%] | 0.18% [0.10%, 0.31%] |
-| `openhands_stuck` | 0.90% (85) | 0.92% ($45.52) | 41.18% | 42.68% [34.09%, 51.76%] | 0.54% [0.29%, 0.84%] |
-| `gemini_cli` | 4.44% (419) | 2.05% ($100.87) | 22.20% | 28.60% [25.04%, 31.99%] | 1.62% [1.42%, 1.82%] |
-| `openclaw_10` | 0.18% (17) | 0.04% ($2.14) | 29.41% | 41.06% [23.53%, 64.71%] | 0.03% [0.01%, 0.08%] |
-| `openclaw_20` | 0.07% (7) | 0.00% ($0.00) | 14.29% | 50.57% [14.29%, 85.71%] | 0.00% [0.00%, 0.00%] |
-| `step_cap_30` | 75.41% (7115) | 63.46% ($3,127.08) | 47.65% | 47.76% [47.60%, 47.90%] | 62.39% [61.79%, 62.82%] |
-| `step_cap_50` | 56.01% (5285) | 41.70% ($2,054.76) | 43.88% | 44.08% [43.92%, 44.24%] | 40.88% [40.38%, 41.22%] |
-| `step_cap_75` | 31.90% (3010) | 23.17% ($1,141.56) | 40.13% | 40.21% [39.97%, 40.40%] | 22.79% [22.42%, 22.97%] |
-| `step_cap_100` | 17.23% (1626) | 12.95% ($638.10) | 37.76% | 38.06% [37.70%, 38.44%] | 12.57% [12.19%, 12.76%] |
-| `step_cap_150` | 6.10% (576) | 4.81% ($236.99) | 38.54% | 38.65% [38.19%, 39.24%] | 4.69% [4.59%, 4.75%] |
-| `turn_budget_1_25x_p90` | 4.98% (470) | 4.06% ($200.09) | 30.00% | 29.94% [29.15%, 30.64%] | 3.91% [3.56%, 4.02%] |
+| `cline_style` | 0.37% (35) | 0.84% ($63.16) | 37.14% | 46.19% [34.21%, 60.00%] | 0.43% [0.20%, 0.87%] |
+| `openhands_stuck` | 0.90% (85) | 1.29% ($96.86) | 41.18% | 42.68% [34.09%, 51.76%] | 0.73% [0.41%, 1.20%] |
+| `gemini_cli` | 4.44% (419) | 2.14% ($160.74) | 22.20% | 28.60% [25.04%, 31.99%] | 1.53% [1.28%, 1.97%] |
+| `openclaw_10` | 0.18% (17) | 0.70% ($52.43) | 29.41% | 41.06% [23.53%, 64.71%] | 0.34% [0.13%, 0.79%] |
+| `openclaw_20` | 0.07% (7) | 0.64% ($47.69) | 14.29% | 50.57% [14.29%, 85.71%] | 0.26% [0.07%, 0.69%] |
+| `step_cap_30` | 75.41% (7115) | 63.76% ($4,786.08) | 47.65% | 47.76% [47.60%, 47.90%] | 62.45% [61.97%, 62.94%] |
+| `step_cap_50` | 56.01% (5285) | 41.62% ($3,123.74) | 43.88% | 44.08% [43.92%, 44.24%] | 40.80% [40.30%, 41.19%] |
+| `step_cap_75` | 31.90% (3010) | 23.07% ($1,731.58) | 40.13% | 40.21% [39.97%, 40.40%] | 22.69% [22.43%, 22.87%] |
+| `step_cap_100` | 17.23% (1626) | 13.18% ($989.50) | 37.76% | 38.06% [37.70%, 38.44%] | 12.90% [12.64%, 13.04%] |
+| `step_cap_150` | 6.10% (576) | 5.38% ($403.59) | 38.54% | 38.65% [38.19%, 39.24%] | 5.29% [5.22%, 5.33%] |
+| `turn_budget_1_25x_p90` | 4.98% (470) | 4.43% ($332.17) | 30.00% | 29.94% [29.15%, 30.64%] | 4.32% [4.10%, 4.40%] |
 
 ## 5. Per-Harness Summary
 
@@ -97,23 +97,23 @@ All numbers below are generated programmatically from cached public trajectory d
 ### SWE-rebench July 2026
 | Participant | Runs | Loop Runs (%) | Loop Step Share | Loop Dollar Share | Pass (Loop vs Clean) | 1.25x P90 Budget |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `minimax-m3` | 555 | 99.28% | 5.95% | 7.60% | 47.19% vs 50.00% | 364 |
+| `minimax-m3` | 555 | 99.28% | 5.95% | 7.90% | 47.19% vs 50.00% | 364 |
 | `qwen3.5-35b-a3b` | 555 | 97.12% | 7.98% | 6.24% | 16.51% vs 37.50% | 164 |
 | `qwen3.6-35b-a3b` | 555 | 96.58% | 8.46% | 7.72% | 24.63% vs 26.32% | 133 |
 | `qwen3.6-27b` | 555 | 95.68% | 6.84% | 4.88% | 31.45% vs 25.00% | 127 |
-| `mimo-v2.5-pro` | 555 | 90.09% | 4.52% | 5.02% | 46.60% vs 45.45% | 135 |
+| `mimo-v2.5-pro` | 555 | 90.09% | 4.52% | 3.94% | 46.60% vs 45.45% | 135 |
 | `deepseek-v4-pro` | 555 | 85.41% | 4.49% | 4.30% | 40.72% vs 37.04% | 125 |
 | `sonnet-5` | 555 | 70.81% | 1.96% | 2.79% | 55.98% vs 58.64% | 133 |
 | `cursor` | 555 | 61.26% | 2.75% | 3.90% | 46.76% vs 59.53% | 113 |
 | `glm-5.2` | 555 | 61.08% | 1.72% | 1.40% | 65.78% vs 58.33% | 198 |
 | `opus-5` | 555 | 37.84% | 1.12% | 1.06% | 62.38% vs 64.06% | 126 |
-| `claude-code` | 555 | 31.89% | 6.41% | n/a | 46.89% vs 66.67% | 120 |
+| `claude-code` | 555 | 31.89% | 6.41% | 4.44% | 46.89% vs 66.67% | 120 |
 | `fable-5` | 555 | 25.41% | 0.71% | 0.87% | 57.45% vs 66.91% | 96 |
 | `grok-4.5` | 555 | 23.24% | 0.65% | 0.82% | 62.79% vs 64.08% | 89 |
 | `codex` | 555 | 20.54% | 2.24% | 2.27% | 60.53% vs 57.37% | 39 |
 | `junie` | 555 | 15.68% | 0.38% | n/a | 59.77% vs 62.18% | 109 |
 | `gpt-5.6-sol` | 555 | 13.87% | 0.85% | 0.73% | 63.64% vs 62.13% | 33 |
-| `gpt-5.6-luna` | 555 | 9.01% | 0.57% | 0.57% | 32.00% vs 44.75% | 25 |
+| `gpt-5.6-luna` | 555 | 9.01% | 0.57% | 0.55% | 32.00% vs 44.75% | 25 |
 
 ## 6. Top 10 Loop-Prone Tasks for Gemini-Family Models (full 20 in `results/loop_prone_tasks.csv`)
 
@@ -136,3 +136,19 @@ All numbers below are generated programmatically from cached public trajectory d
 - Simulations with any pathological loop: **2,769 (25.56%)**; loop step share: **10.96%**.
 - Breakdown: exact_loop=2689, near_duplicate=19, aba_thrash=679, period_k_rotation=175, error_streak=160, redundant_reread=0; productive_repeat=2387.
 - Pass rate: looping 48.36% vs loop-free 72.45%.
+
+## 8. Phase 2 Fair Open-Weights vs Closed Comparison (Within-Scaffold, Common Tasks)
+
+See [`results/open_vs_closed_model.md`](open_vs_closed_model.md), [`results/loops_by_model_scaffold.csv`](loops_by_model_scaffold.csv), and `../ARTICLE_DRAFT.md`.
+
+| Cohort | Unmatched Gap Loops/100 [95% CI] | Overlap Bands | Matched Gap Loops/100 [95% CI] | NB Offset Adj IRR (p_2way) |
+| --- | ---: | ---: | ---: | ---: |
+| `tb_terminus_2` | +4.22 [+2.83, +5.58] | 4 | +4.20 [+2.86, +5.49] | 1.56 (0.3266) |
+| `tb_openhands` | +7.11 [+4.04, +10.23] | 1 | +6.86 [+3.79, +10.08] | 1.77 (0.0272) |
+| `tb_mini_swe_agent` | +8.08 [-1.90, +20.06] | 1 | +0.50 [-10.21, +12.85] | 1.01 (0.9503) |
+| `swe_rebench_swelike` | +4.73 [+4.46, +5.00] | 2 | +2.54 [+2.30, +2.78] | 2.69 (0.0014) |
+| `longtail_swe_swelike` | +2.45 [+2.13, +2.79] | 1 | +0.08 [-0.22, +0.36] | 1.08 (0.7974) |
+| `tau2_classic` | -0.34 [-0.61, -0.04] | 1 | -0.32 [-0.59, -0.04] | 0.03 (0.0167) |
+| `tau2_banking_knowledge_alltools` | -1.13 [-2.65, +0.62] | 1 | +0.82 [+0.38, +1.42] | 0.90 (0.8368) |
+
+- **Pooled within-scaffold regression**: `is_open_weight` NB `log(steps)`-offset IRR = **1.31** (`[0.81, 2.13]`, `p=0.2765`); Logit OR = **2.25** (`[1.11, 4.53]`, `p=0.0236`).
