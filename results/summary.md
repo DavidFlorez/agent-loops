@@ -88,11 +88,11 @@ All numbers below are generated programmatically from cached public trajectory d
 | `deepagent-harbor` | 417 | 46.04% | 8.55% | n/a | 79.17% vs 58.67% | 86 |
 | `judy` | 157 | 38.85% | 1.66% | n/a | 81.97% vs 72.92% | 64 |
 | `mini-swe-agent` | 6,495 | 32.58% | 13.72% | 27.76% | 19.94% vs 25.01% | 45 |
-| `claude-code` | 2,522 | 29.94% | 2.21% | 0.00% | 40.79% vs 44.77% | 120 |
+| `claude-code` | 2,522 | 29.94% | 2.21% | n<100 | 40.79% vs 44.77% | 120 |
 | `gemini-cli` | 787 | 22.49% | 6.66% | n/a | 15.82% vs 20.49% | 38 |
 | `terminus-2` | 15,941 | 22.48% | 6.73% | 15.03% | 23.07% vs 35.21% | 40 |
 | `codex` | 1,410 | 14.54% | 2.09% | n/a | 33.66% vs 33.86% | 47 |
-| `terminus-3-3` | 678 | 11.65% | 0.87% | 0.88% | 64.56% vs 75.96% | 54 |
+| `terminus-3-3` | 678 | 11.65% | 0.87% | n<100 | 64.56% vs 75.96% | 54 |
 
 ### SWE-rebench July 2026
 | Participant | Runs | Loop Runs (%) | Loop Step Share | Loop Dollar Share | Pass (Loop vs Clean) | 1.25x P90 Budget |

@@ -1,101 +1,85 @@
-# Do open-weight agents loop more? What four public trajectory sets say
+# Do open-weight agents loop more? What 58,950 public trajectories actually show
 
-*Offline audit across Terminal-Bench 2.0, SWE-rebench July 2026, Longtail-SWE, and Sierra's public τ²-bench archive.*
+Put the exact same model weights inside two different agent harnesses on the exact same coding tasks, and its loop rate often swings more than the gap between open-weight and closed frontier models.[^1] Across Terminal-Bench 2.0 and SWE-rebench, running identical weights across scaffolds shifts loop density by a median of **6.48 loops per 100 steps**—and up to **26.08 loops per 100 steps** on `gpt-5.2`—while the capability- and length-matched gap between open-weight and closed models on SWE-rebench is just **+0.77 loops per 100 steps** (`95% CI [+0.50, +1.02]`).[^1][^2]
 
-## The short answer
+![SWE-rebench Open vs Closed Loop Gap Across Controls](assets/hero_raw_vs_controlled.png)
 
-Across **56,797 executed agent trajectories** spanning **7 uniform-scaffold cohorts** (and `104` model-scaffold evaluations across four public benchmarks), comparing raw averages without controls makes open-weight models look worse than they often are — because weak legacy open checkpoints pull raw averages up while frontier closed agent harnesses conceal bespoke loop guards inside proprietary scaffolds.
+We audited **56,797 executed trajectories** across Terminal-Bench 2.0, SWE-rebench, Longtail-SWE, and Sierra's τ²-bench using a deterministic step labeler, cache-aware billing reconstruction, and counterfactual loop-detector replay.[^3] Here is what holds up when we try to break the result.
 
-Once we hold both **the agent scaffold and the exact task set constant** and match models inside identical pass-rate capability bands (`B1 <25%` through `B5 >=75%`), the headline picture fractures rather than confirming a universal open-weight defect: out of cohorts with overlapping pass-rate bands, **4** show a positive Open-vs-Closed loop-rate gap, **2** show no statistically distinguishable difference (95% task-clustered CI crosses zero), and **1** reverse (Open-Weights loop *less* than Closed models at the same capability level).
+## 1. The Raw Gap Looks Huge—Until You Inspect Who Ran What
 
-In a pooled within-scaffold Negative Binomial count regression with `log(steps)` exposure offset and two-way `(model, task)` cluster-robust standard errors — adjusting simultaneously for model pass rate, release month, serving route, task difficulty, and cohort scaffold — open-weight status carries an Incidence Rate Ratio (**IRR**) of **1.31** (`95% CI [0.81, 2.13]`, `p=0.2765`), while a run-level Logistic regression for exhibiting at least one loop gives Odds Ratio (**OR**) **2.25** (`[1.11, 4.53]`, `p=0.0236`; hierarchical random-task `BinomialBayesMixedGLM` OR **2.61**).
- By contrast, **+10 percentage points of model pass rate** shifts loop density with IRR **0.86** (`p=0.0122`), and every **+100 steps in scaffold step cap** moves loop rate with IRR **1.22** (`p=0.0000`).
+Naive averages on standard scaffolds make open-weight models look far more prone to looping.[^3] On Terminal-Bench `terminus-2` (`16` open vs `16` closed models across `89` tasks), open models average **6.91** loop steps per 100 steps vs **2.69** for closed models (unmatched gap **+4.22**).[^3] On SWE-rebench `swelike` (`7` open vs `6` closed models across `111` tasks), open models average **5.71** vs **0.98** loops/100 steps (gap **+4.73**), with **89.3%** of open runs flagging at least one loop vs **30.0%** of closed runs.[^3]
 
-## Why naive open-vs-closed benchmarks mislead
+Three confounders inflate those raw gaps:[^3]
+1. **Capability mismatch**: Leaderboards pair legacy `3%–19%` pass-rate open models (`gpt-oss-20b`, `gpt-oss-120b`) against `60%–72%` closed models; failing runs repeat broken commands until the turn cap.
+2. **Longer open-weight runs**: On SWE-rebench `swelike`, open models average **94.7** steps/run vs **45.4** for closed models, giving them more chances to cross any binary per-run loop threshold.[^2]
+3. **Hidden harness and tool differences**: Proprietary entries (`claude-code`, `codex`, `gemini-cli`, `cursor`, `junie`) bundle custom loop guards, while Sierra's `banking_knowledge` folder mixes four retrieval toolsets (`AllTools`, `terminal_use`, `openai_embeddings`, `qwen_embeddings`).[^3]
 
-Three confounders routinely masquerade as an intrinsic weight property:
-1. **Scaffold mixing**: Custom proprietary harnesses (`claude-code`, `codex`, `gemini-cli`, `cursor`, `junie`) only ran closed models and already ship bespoke retry/turn guards. Pooling them against open models on bare `terminus-2` or `swelike` measures harness engineering, not weights.
-2. **Retrieval tool asymmetry (`tau2 banking_knowledge`)**: Inspecting Sierra's S3 `results.json` metadata revealed four different retrieval harnesses inside `banking_knowledge` alone — `AllTools` (`BM25 + dense + shell`), `terminal_use` (`shell` only, e.g. `gemini-3-flash` and `gemini-3-pro`), `openai_embeddings`, and `qwen_embeddings`. Our fair comparison strictly isolates the **20 uniform `AllTools` models** (`3` Open vs `17` Closed).
-3. **Capability imbalance & context truncation**: Comparing a `10%`-pass model that slams into brick walls against an `80%`-pass frontier model inflates failure looping. Meanwhile on Longtail-SWE (`swelike`), closed models ran with `1,000K–1,050K` context while 4 of 5 open models ran at `262K` (and `131K` on `qwen3.6-27b` reruns), and `deepseek-v4-flash` suffered `49` zero-step API timeouts.
+## 2. Controlling for Skill, Run Length, Labeler Strictness, and Model Sampling
 
-## What each of the four datasets shows
+Matching open and closed models inside identical pass-rate bands (`<25%`, `25–40%`, `40–55%`, `55–75%`, `>=75%`) on the same scaffold and tasks cuts the SWE-rebench gap nearly in half, from **+4.73** to **+2.54** loops/100 steps (`1-stage task CI [+2.30, +2.78]`).[^3] Matching simultaneously on pass-rate band and step-count decile trims it to **+0.77** (`[+0.50, +1.02]`).[^2]
 
-| Cohort (Identical Scaffold & Shared Tasks) | Unmatched Loops/100 (Open vs Closed) | Unmatched Gap [95% CI] | Matched Gap [95% CI] | Adjusted NB IRR (p_2way) | Verdict |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Terminal-Bench 2.0 (terminus-2) | 6.91 vs 2.69 | +4.22 [+2.83, +5.58] | +4.20 [+2.86, +5.49] | 1.56 (0.3266) | higher for Open-Weights |
-| Terminal-Bench 2.0 (openhands) | 14.76 vs 7.66 | +7.11 [+4.04, +10.23] | +6.86 [+3.79, +10.08] | 1.77 (0.0272) | higher for Open-Weights |
-| Terminal-Bench 2.0 (mini-swe-agent) | 19.99 vs 11.91 | +8.08 [-1.90, +20.06] | +0.50 [-10.21, +12.85] | 1.01 (0.9503) | statistically indistinguishable from zero (null) |
-| SWE-rebench Jul 2026 (swelike) | 5.71 vs 0.98 | +4.73 [+4.46, +5.00] | +2.54 [+2.30, +2.78] | 2.69 (0.0014) | higher for Open-Weights |
-| Longtail-SWE (swelike) | 3.42 vs 0.96 | +2.45 [+2.13, +2.79] | +0.08 [-0.22, +0.36] | 1.08 (0.7974) | statistically indistinguishable from zero (null) |
-| Sierra tau2 Classic (airline+retail+telecom) | 0.42 vs 0.76 | -0.34 [-0.61, -0.04] | -0.32 [-0.59, -0.04] | 0.03 (0.0167) | reversed (lower for Open-Weights) |
-| Sierra tau2 Banking Knowledge (AllTools) | 2.70 vs 3.83 | -1.13 [-2.65, +0.62] | +0.82 [+0.38, +1.42] | 0.90 (0.8368) | higher for Open-Weights |
+Trajectory length explains almost the entire binary gap in *"how many runs have at least one loop."* In a run-level logistic regression with task fixed effects and two-way `(model, task)` cluster-robust SEs, open-weight status has an odds ratio of **8.43** (`p=0.0005`) on SWE-rebench and **2.25** (`p=0.024`) pooled across all seven cohorts.[^2][^3] Adding `log(steps)` collapses the SWE-rebench odds ratio to **1.34** (`p=0.58`) and the pooled odds ratio to **1.47** (`p=0.25`)—both indistinguishable from `1.0`.[^2][^3] Open models flag more runs mainly because their trajectories run longer.
 
-### Cohort-by-cohort highlights
+![Pre-Specified Cohort Verdicts](assets/cohort_verdicts.png)
 
-- **Terminal-Bench 2.0 (terminus-2)**: Before matching, Open averaged **6.91** vs Closed **2.69** loops/100 steps (gap **+4.22**; any-loop run share gap **+16.25 pp**). After capability-band matching (4 overlapping band(s)), the gap is **+4.20** `[+2.86, +5.49]` loops/100 steps (**higher for Open-Weights**).
-- **Terminal-Bench 2.0 (openhands)**: Before matching, Open averaged **14.76** vs Closed **7.66** loops/100 steps (gap **+7.11**; any-loop run share gap **+25.34 pp**). After capability-band matching (1 overlapping band(s)), the gap is **+6.86** `[+3.79, +10.08]` loops/100 steps (**higher for Open-Weights**).
-- **Terminal-Bench 2.0 (mini-swe-agent)**: Before matching, Open averaged **19.99** vs Closed **11.91** loops/100 steps (gap **+8.08**; any-loop run share gap **-2.74 pp**). After capability-band matching (1 overlapping band(s)), the gap is **+0.50** `[-10.21, +12.85]` loops/100 steps (**statistically indistinguishable from zero (null)**).
-- **SWE-rebench Jul 2026 (swelike)**: Before matching, Open averaged **5.71** vs Closed **0.98** loops/100 steps (gap **+4.73**; any-loop run share gap **+59.29 pp**). After capability-band matching (2 overlapping band(s)), the gap is **+2.54** `[+2.30, +2.78]` loops/100 steps (**higher for Open-Weights**).
-- **Longtail-SWE (swelike)**: Before matching, Open averaged **3.42** vs Closed **0.96** loops/100 steps (gap **+2.45**; any-loop run share gap **+56.41 pp**). After capability-band matching (1 overlapping band(s)), the gap is **+0.08** `[-0.22, +0.36]` loops/100 steps (**statistically indistinguishable from zero (null)**).
-- **Sierra tau2 Classic (airline+retail+telecom)**: Before matching, Open averaged **0.42** vs Closed **0.76** loops/100 steps (gap **-0.34**; any-loop run share gap **-3.41 pp**). After capability-band matching (1 overlapping band(s)), the gap is **-0.32** `[-0.59, -0.04]` loops/100 steps (**reversed (lower for Open-Weights)**).
-- **Sierra tau2 Banking Knowledge (AllTools)**: Before matching, Open averaged **2.70** vs Closed **3.83** loops/100 steps (gap **-1.13**; any-loop run share gap **+9.84 pp**). After capability-band matching (1 overlapping band(s)), the gap is **+0.82** `[+0.38, +1.42]` loops/100 steps (**higher for Open-Weights**).
+To avoid cherry-picking across seven uniform-scaffold cohorts, we applied one pre-specified verdict rule: a cohort is **"higher for open"** only if its matched-gap 95% CI excludes zero *and* its adjusted Negative Binomial `IRR` is reliable with `p < 0.05`.[^4] Under 1-stage task bootstrapping, only **swe_rebench_swelike** (matched gap `+2.54`, NB `IRR=2.69, p=0.0001`) and **tb_openhands** clear both bars.[^4] Terminal-Bench `terminus-2` (`+4.20` matched gap, NB `IRR=1.41, p=0.33`), `tb_mini_swe_agent`, and Sierra `tau2_banking_knowledge_alltools` (`-1.13` unmatched, `+0.82` matched, NB `IRR=0.92, p=0.84`) land in **"mixed"** or **"null"** (`Longtail-SWE` has zero overlapping skill bands because closed models used `1M` context vs `262K` for open models).[^3][^4] Upgrading to a **two-stage `(model, task)` bootstrap** (`[+2.04, +3.05]` on SWE-rebench; `[+1.44, +6.88]` on TB) widens CIs `1.5x–3x`, reflecting `2–16` models per side.[^4]
 
-### Longtail-SWE context & adjacent-frontier check
+We also audited labeler precision across 40 random flagged runs (`audit/flagged_samples.md`) and tested a **strict labeler** keeping only exact commands repeated `>=3` times consecutively, A-B-A thrashing (`>=3` cycles), and period-`k` rotations—dropping single repeats, near-duplicates, redundant re-reads, and error streaks.[^5][^6] Under strict rules, SWE-rebench loop density falls `~70%` in both groups—to **0.13** vs **0.02** loops/100 (`Open` vs `Closed`), shrinking the matched gap to **+0.04** (`1.12` vs `0.67` unmatched on TB).[^6] Furthermore, **47.6%** of open-weight `exact_loop` steps on SWE-rebench (`48.7%` for closed) are harmless read-only checks (`git diff`, `git status`, `grep`, `cat`, `ls`, or unchanged `pytest`).[^7]
 
-- Closest capability neighbors in Longtail-SWE (`swelike`): `kimi-k3` (Open, `262144` ctx, 63.70% pass -> 1.27 loops/100); `deepseek-v4-flash` (Open, `1048576` ctx, 61.04% pass -> 2.06 loops/100); `gpt-5.6-sol` (Closed, `1050000` ctx, 75.74% pass -> 1.00 loops/100); `gpt-5.6-luna` (Closed, `1050000` ctx, 71.45% pass -> 1.58 loops/100).
+![Frontier Showdown on SWE-rebench](assets/glm52_vs_opus5.png)
 
-## Model families, including Google Gemini
+In dollar terms (`6,381` cost-validated SWE-rebench runs), pooled loop spend is **2.38% ($117.38 / $4,927.87)** because expensive low-looping closed runs dominate total spend, though within individual models loop dollar share exceeds step share.[^8] Among SWE-rebench frontier peers, open-weight `glm-5.2` hits a **62.9%** pass rate at **$0.38/run** (`1.56` loops/100; `2.18%` loop dollars), competing with `opus-5` (**63.6%** pass, **$1.64/run**, `0.67` loops/100), `grok-4.5` (**64.1%** pass, **$2.25/run**, `0.65` loops/100), and `gpt-5.6-sol` (**72.1%** pass, **$0.55/run**, `0.31` loops/100).[^3][^6]
 
-Aggregation into binary `Open` vs `Closed` buckets hides huge variance inside *both* camps. Here is how individual families behaved across every primary uniform scaffold:
+## 3. Production Loop Detectors Beat Random Stopping on Precision and Savings
 
-### Google Gemini across Terminal-Bench and Sierra τ²
+![Production Loop Guards vs Matched Random Stoppers](assets/detectors_vs_random.png)
 
-| Benchmark & Uniform Scaffold | Model | Executed Pass Rate | Loops / 100 Steps [95% CI] | Any-Loop Run Rate |
-| --- | --- | ---: | ---: | ---: |
-| `tau2_banking_knowledge_alltools` | `gemini-2.5-pro` | 12.76% | 2.91 [1.58, 5.03] | 27.08% |
-| `tau2_banking_knowledge_alltools` | `gemini-3.1-pro` | 22.54% | 7.80 [6.05, 9.63] | 48.45% |
-| `tau2_classic` | `gemini-3-flash` | 80.94% | 1.92 [1.59, 2.27] | 17.90% |
-| `tau2_classic` | `gemini-3-pro` | 84.82% | 0.15 [0.05, 0.33] | 1.47% |
-| `tb_mini_swe_agent` | `gemini-2.5-flash` | 17.59% | 30.64 [20.74, 39.09] | 49.31% |
-| `tb_mini_swe_agent` | `gemini-2.5-pro` | 26.67% | 17.81 [10.54, 26.12] | 41.38% |
-| `tb_openhands` | `gemini-2.5-flash` | 16.74% | 9.98 [8.25, 12.00] | 59.86% |
-| `tb_openhands` | `gemini-2.5-pro` | 16.74% | 17.19 [11.59, 23.46] | 57.34% |
-| `tb_terminus_2` | `gemini-2.5-flash` | 17.86% | 4.68 [1.75, 8.65] | 14.76% |
-| `tb_terminus_2` | `gemini-2.5-pro` | 33.41% | 2.49 [1.34, 4.18] | 11.37% |
-| `tb_terminus_2` | `gemini-3-flash` | 52.59% | 4.53 [1.03, 9.94] | 12.03% |
-| `tb_terminus_2` | `gemini-3-pro` | 58.82% | 0.94 [0.42, 1.57] | 6.82% |
-| `tau2_bk_terminal_use` (`terminal_use` scaffold) | `gemini-3-flash` | 20.62% | 10.03 | 76.55% |
-| `tau2_bk_terminal_use` (`terminal_use` scaffold) | `gemini-3-pro` | 15.72% | 16.16 | 57.22% |
+Replaying `gemini_cli`, `openclaw_10` (30-step sliding window), `cline_style` (5 identical consecutive actions), and `openhands_stuck` against 200-seed step-matched random stoppers shows:[^9]
+- **Terminal-Bench 2.0**: `gemini_cli` halves the false-stop rate (`FSR`, stopped runs that would have passed)—**10.77%** vs **23.18%** (`95% CI [20.51%, 25.90%]`) random—saving **5.71% ($190.06)** of validated spend (`0.24 pp` pass-rate loss). `openclaw_10` saves **5.05% ($168.28)** at **13.49% FSR** (`0.19 pp` loss), and `cline_style` saves **5.00% ($166.68)** at **18.38% FSR** vs **23.05%** random.[^9]
+- **SWE-rebench**: `gemini_cli` saves **2.05% ($100.87)** vs **1.62%** (`[1.42%, 1.82%]`) random, with **22.20% FSR** vs **28.60%** (`[25.04%, 31.99%]`) random. Adjacent-step guards (`cline_style`) miss **82.9% (`277/334`)** of `period_k_rotation` cycles on TB and **98.3% (`118/120`)** on SWE-rebench—making sliding-window memory (`openclaw_10`) essential.[^8][^9]
 
-### Highest and lowest looping families per cohort
+## 4. Same Model, Different Harness: Scaffolds Move Loop Rates as Much as Weights
 
-- **Terminal-Bench 2.0 (terminus-2)**: lowest loop density `deepseek` (Open, 0.82/100 @ 41.76% pass); highest `qwen (open)` (Open, 13.33/100 @ 25.23% pass).
-- **Terminal-Bench 2.0 (openhands)**: lowest loop density `gpt` (Closed, 5.40/100 @ 28.48% pass); highest `qwen (open)` (Open, 16.03/100 @ 25.98% pass).
-- **Terminal-Bench 2.0 (mini-swe-agent)**: lowest loop density `gpt` (Closed, 8.51/100 @ 27.00% pass); highest `gemini` (Closed, 24.22/100 @ 22.13% pass).
-- **SWE-rebench Jul 2026 (swelike)**: lowest loop density `grok` (Closed, 0.65/100 @ 63.78% pass); highest `qwen (open)` (Open, 7.76/100 @ 24.32% pass).
-- **Longtail-SWE (swelike)**: lowest loop density `claude` (Closed, 0.45/100 @ 81.52% pass); highest `qwen (open)` (Open, 5.27/100 @ 29.70% pass).
-- **Sierra tau2 Classic (airline+retail+telecom)**: lowest loop density `claude` (Closed, 0.16/100 @ 81.52% pass); highest `gpt` (Closed, 1.09/100 @ 77.92% pass).
-- **Sierra tau2 Banking Knowledge (AllTools)**: lowest loop density `claude` (Closed, 1.78/100 @ 36.54% pass); highest `grok` (Closed, 7.97/100 @ 23.02% pass).
+![Same Model Across Different Harnesses](assets/harness_dumbbell.png)
 
-## Sensitivity checks: passing runs, failing runs, legacy checkpoints & hosting
+Models evaluated across multiple scaffolds on shared tasks (`results/same_model_across_harness.csv`) show that swapping the harness while holding weights and tasks fixed shifts looping dramatically:[^1]
+- **`gpt-5.2` (Closed, TB)**: Jumps from **0.71** loops/100 in `codex` to **1.50** in `terminus-2` and **12.56** in `mini-swe-agent` (**11.85**/100 spread).[^1]
+- **`claude-opus-4-5` & `claude-sonnet-4-5` (Closed, TB & SWE)**: Shift from **0.72–1.27** in `terminus-2` to **4.15–4.75** in `claude-code`, **3.79–4.59** in `mini-swe-agent`, and **3.66–4.84** in `openhands` (**3.69–4.03**/100 spread).[^1]
+- **`gpt-oss-120b` & `qwen3-coder-480b` (Open, TB)**: Drop from **10.75** and **4.14** in `terminus-2` to **3.22** (`mini-swe-agent`) and **2.26** (`openhands`), cutting open-model looping by `45%–70%`.[^1]
 
-- **Passing runs only vs failing runs only**: Restricting strictly to solved tasks (`pass_only`) vs failed attempts (`fail_only`) tests whether any gap comes from verification habits on winning trajectories or flailing on unsolved ones — full cohort CIs sit in [`results/open_vs_closed_model.md`](results/open_vs_closed_model.md).
-- **Dropping legacy `gpt-oss-20b/120b`**: Exposes how much of Terminal-Bench's raw open-weight loopiness comes from weak 3–19%-pass legacy models rather than modern open releases.
-- **First-party routes only**: Only `tb_terminus_2` includes native first-party Open endpoints (`deepseek-v3.2`, `glm-5`, `minimax-m2.5`); every Open model in Sierra `AllTools` (`glm-5-2`, `inkling`, `kimi-k3`) ran via OpenRouter proxies (`third_party`), underscoring that third-party inference routing and quantization remain intertwined with open-weight evaluations.
+Part of this spread reflects step-logging granularity: `terminus-2` batches multi-command shell turns, whereas `claude-code` and `mini-swe-agent` log per-tool steps (and raw `openhands` pairs action and observation events collapsed before scoring).[^1]
 
-## Dollar cost and loop detector implications
+## 5. Inside the Google Gemini Family
 
-From our earlier cache-aware billing audit (unchanged), loop steps account for **17.71%** of validated spend on Terminal-Bench 2.0 and **2.87%** on SWE-rebench overall (with late-context bloat doubling dollar share vs step share within models), while rotating/A-B-A cycles slip past naive 5-adjacent-step guards (`277/334` missed on TB; `118/120` on SWE-rebench).
+Binary "open vs closed" labels also hide wide spread inside a single vendor. Across Google Gemini checkpoints:[^3][^10]
+- On Terminal-Bench `terminus-2`, **`gemini-2.5-flash`** (`16.9%` pass) hits **12.22 loops/100** (`47.0%` of runs looping) and **`gemini-2.5-pro`** (`29.2%` pass) hits **9.24**, whereas **`gemini-3-pro`** (`44.2%` pass) drops to **4.57** and **`gemini-3-flash`** (`48.3%` pass) reaches **3.25**.[^3] Moving `gemini-3-pro` and `gemini-3-flash` into `gemini-cli` cuts loop rates to **2.15** and **1.52** loops/100.[^1]
+- On Sierra τ²-bench, `gemini-3-pro` (`0.93`/100) and `gemini-3-flash` (`1.92`/100) are disciplined on `tau2_classic`, and on `banking_knowledge` (`AllTools`) `gemini-2.5-pro` (`0.81`/100) and `gemini-3.1-pro-preview` (`1.91`/100) rank near the top.[^3] Placing `gemini-3-flash` and `gemini-3-pro` in Sierra's shell-only `terminal_use` scaffold raises loop rates to **2.98** and **2.35** loops/100.[^10]
 
-The fair open-vs-closed evidence points to three practical engineering conclusions:
-1. **Scaffold & budget discipline beats weight stereotypes**: Harness step caps, rolling-window cycle detection (`openclaw_10`-style multi-period memory), and adequate context windows cut loop spend across *both* open and closed models far more reliably than choosing closed weights alone.
-2. **Watch model pass rate and hosting route before blaming weights**: On equal scaffolds and capability bands, strong open models frequently match or beat closed peers in loop discipline, while weaker models in *either* camp (e.g., `gemini-2.5-flash`, `gpt-5-nano`, `gpt-oss`, `qwen3.6`) loop aggressively when stuck.
-3. **Audit retrieval/proxy metadata in public leaderboards**: Silent differences in toolsets (`AllTools` vs `terminal_use`), context truncation (`262K` vs `1M`), and OpenRouter/FP8 hosting can swing loop rates by multiples inside the same benchmark folder.
+## 6. Limitations and Audit Diagnostics
 
-## Visuals
+1. **Finite model sample size**: Cohorts contain `2–16` open and `4–17` closed models; two-stage `(model, task)` bootstraps capture model-sampling variance.[^4]
+2. **Regression collinearity in `tau2_classic`**: Phase 2 reported an adjusted NB `IRR = 0.03` (`p = 0.017`) on `tau2_classic` despite raw rates of **0.42** (Open) vs **0.76** (Closed) loops/100 (**0.56x** raw ratio).[^4][^11] Both open models released in Feb 2026 (`month=13`), while all six closed models released in Sep–Dec 2025 (`months=8..11`), where Dec closed models looped more than Sep Claude models (`IRR=3.11/month`). Dropping `release_months` restores NB `IRR` to **0.56** (`p=0.008`), matching the raw ratio.[^11]
+3. **Terminal-Bench cost rebuild exclusions (`n<100` suppression)**: Our `[0.50x, 2.00x]` filter kept `5,011` TB runs (**800** closed runs) and dropped `24,543` mismatches (median RSC ratio `0.12x`).[^12] Over `85%` of dropped runs contain unresolved Next.js RSC `$<hex>` pointers (`$3b`, `$4a`) in `tbench.ai` exports replacing multi-KB outputs with 3-byte strings—not a `cost_cents / 100` or `cache_tokens` bug.[^12] Cells with `<100` cost-valid runs are suppressed as `n<100`.[^3]
+4. **Missing Terminal-Bench step traces**: `17,642` of `52,104` TB rows have `steps = null`, including `claude-opus-4-6` (`70.8%` pass), `gpt-5.3-codex` (`68.5%`), and `gemini-3.1-pro-preview` (`65.2%`).[^13]
 
-- `assets/loops_per_100_by_model_band.png` — Loops per 100 steps (95% CI) by model and capability band.
-- `assets/open_closed_gap_before_after_matching.png` — Open-minus-Closed gap before vs after pass-rate band matching.
-- `assets/open_vs_closed_across_four_datasets.png` — Pass rate vs loop rate across all four datasets.
-- Full per-model table: [`results/loops_by_model_scaffold.csv`](results/loops_by_model_scaffold.csv) and detailed stats: [`results/open_vs_closed_model.md`](results/open_vs_closed_model.md).
+> ### Method Box: Labels, Matching & Regression Specifications
+> - **Default vs Strict Labeler**: Normalization strips ANSI codes, timestamps, UUIDs, and temp paths. The default 6-class labeler flags `exact_loop`, `near_duplicate`, `aba_thrash`, `period_k_rotation (k<=5)`, `error_streak (>=4)`, and `redundant_reread` while excluding `productive_repeat`. The strict labeler keeps only `>=3` consecutive `exact_loop` steps, `>=3`-cycle `aba_thrash`, and `period_k_rotation`.[^6]
+> - **Matching & Uncertainty**: Executed runs (`n_steps >= 1`) on shared tasks are stratified into five pass-rate bands and ten step-count deciles (`D0..D9`), weighted by `min(N_open, N_closed)`.[^2][^3] We report 1-stage task and 2-stage `(model, task)` bootstraps (`1,000` replicates), plus Negative Binomial and Logistic GLMs (`has_any_loop` with/without `log1p(steps)`) with task fixed effects and two-way `(model, task)` cluster-robust SEs.[^4]
 
+---
+
+### Footnotes & Data Provenance
+[^1]: [`results/same_model_across_harness.csv`](results/same_model_across_harness.csv), [`assets/harness_dumbbell.png`](assets/harness_dumbbell.png).
+[^2]: [`results/length_matched_comparison.csv`](results/length_matched_comparison.csv), [`results/length_decile_breakdown.csv`](results/length_decile_breakdown.csv), [`assets/hero_raw_vs_controlled.png`](assets/hero_raw_vs_controlled.png).
+[^3]: [`results/loops_by_model_scaffold.csv`](results/loops_by_model_scaffold.csv), [`results/open_vs_closed_matched.csv`](results/open_vs_closed_matched.csv), [`results/open_vs_closed_model.md`](results/open_vs_closed_model.md).
+[^4]: [`results/cohort_verdicts.csv`](results/cohort_verdicts.csv), [`results/two_stage_bootstrap_comparison.csv`](results/two_stage_bootstrap_comparison.csv), [`assets/cohort_verdicts.png`](assets/cohort_verdicts.png).
+[^5]: [`audit/flagged_samples.md`](audit/flagged_samples.md).
+[^6]: [`results/strict_vs_default_labeler.csv`](results/strict_vs_default_labeler.csv), [`results/strict_vs_default_by_model.csv`](results/strict_vs_default_by_model.csv), [`assets/glm52_vs_opus5.png`](assets/glm52_vs_opus5.png).
+[^7]: [`results/readonly_exact_loops.csv`](results/readonly_exact_loops.csv).
+[^8]: [`results/study_metrics.json`](results/study_metrics.json), [`results/summary.md`](results/summary.md).
+[^9]: [`results/detector_simulation.csv`](results/detector_simulation.csv), [`assets/detectors_vs_random.png`](assets/detectors_vs_random.png).
+[^10]: [`results/tau2_non_alltools_banking_knowledge.csv`](results/tau2_non_alltools_banking_knowledge.csv), [`results/loops_by_family.csv`](results/loops_by_family.csv).
+[^11]: [`results/tau2_classic_irr_diagnosis.json`](results/tau2_classic_irr_diagnosis.json).
+[^12]: [`results/tb_cost_rebuild_audit.csv`](results/tb_cost_rebuild_audit.csv), [`audit/tb_cost_rebuild_audit.md`](audit/tb_cost_rebuild_audit.md).
+[^13]: [`results/tb_null_step_models.csv`](results/tb_null_step_models.csv).

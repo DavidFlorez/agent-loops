@@ -1,0 +1,102 @@
+{
+  "cohort": "tau2_classic",
+  "n_open_models": 2,
+  "n_closed_models": 6,
+  "total_shared_tasks": 278,
+  "zero_loop_tasks_dropped_in_fe": 127,
+  "informative_tasks_in_fe": 151,
+  "open_release_months": [
+    13.0
+  ],
+  "closed_release_months": [
+    8.0,
+    10.0,
+    11.0
+  ],
+  "root_cause": "Complete separation on release_months + small N_open=2: both Open models (glm-5-think, qwen3.5-397b) were released in 2026-02 (month=13), whereas all 6 Closed models were released in 2025-09..2025-12 (months 8..11). Within Closed models, Dec-2025 releases (gemini-3-flash=1.92, gpt-5-2=1.20) looped much more than Sep/Nov-2025 Claude releases (0.15-0.17), driving the release_months slope to IRR=3.11/month (3.11^3 = 30x over 3 months) and forcing the collinear is_open_weight indicator down to IRR=0.03 to fit the 2 Open models at month=13. Dropping the collinear release_months_c covariate restores NB IRR to 0.60 (p=0.3920), matching the raw rate ratio (0.56).",
+  "nb_with_release_months_irr": {
+    "coef": -3.399149518898912,
+    "se": 1.420939033105049,
+    "irr_or": 0.03340166536887644,
+    "ci_low": 0.002061770861852823,
+    "ci_high": 0.541122813430293,
+    "z": -2.392185336390583,
+    "p": 0.01674838256058629
+  },
+  "nb_without_release_months_irr": {
+    "coef": -0.506725915112427,
+    "se": 0.5919212179417555,
+    "irr_or": 0.6024648743731504,
+    "ci_low": 0.1888331416494538,
+    "ci_high": 1.9221410059853539,
+    "z": -0.8560698615846686,
+    "p": 0.3919591379515561
+  },
+  "nb_bivariate_no_task_fe_irr": {
+    "coef": -0.45584177348121946,
+    "se": 0.38888710218395034,
+    "irr_or": 0.6339141311899313,
+    "ci_low": 0.2958033233150078,
+    "ci_high": 1.3584942901211055,
+    "z": -1.1721699457792725,
+    "p": 0.2411288321460483
+  },
+  "models": [
+    {
+      "model": "qwen3.5-397b-a17b-think",
+      "weights": "Open",
+      "executed_pass_rate": 0.8938848920863309,
+      "release_month": "2026-02",
+      "loops_per_100_steps": 0.3908753043701141
+    },
+    {
+      "model": "glm-5-think",
+      "weights": "Open",
+      "executed_pass_rate": 0.8494318181818182,
+      "release_month": "2026-02",
+      "loops_per_100_steps": 0.4588471465443074
+    },
+    {
+      "model": "claude-opus-4-5",
+      "weights": "Closed",
+      "executed_pass_rate": 0.8561151079136691,
+      "release_month": "2025-11",
+      "loops_per_100_steps": 0.16673336001067093
+    },
+    {
+      "model": "gpt-5-2",
+      "weights": "Closed",
+      "executed_pass_rate": 0.8516187050359713,
+      "release_month": "2025-12",
+      "loops_per_100_steps": 1.333678622297035
+    },
+    {
+      "model": "gemini-3-pro",
+      "weights": "Closed",
+      "executed_pass_rate": 0.8482060717571297,
+      "release_month": "2025-11",
+      "loops_per_100_steps": 0.15433181339880744
+    },
+    {
+      "model": "gemini-3-flash",
+      "weights": "Closed",
+      "executed_pass_rate": 0.8093525179856115,
+      "release_month": "2025-12",
+      "loops_per_100_steps": 1.9241716953205055
+    },
+    {
+      "model": "claude-sonnet-4-5",
+      "weights": "Closed",
+      "executed_pass_rate": 0.7742805755395683,
+      "release_month": "2025-09",
+      "loops_per_100_steps": 0.15162502472147144
+    },
+    {
+      "model": "gpt-5-2-none",
+      "weights": "Closed",
+      "executed_pass_rate": 0.706880301602262,
+      "release_month": "2025-12",
+      "loops_per_100_steps": 0.844211123723042
+    }
+  ]
+}

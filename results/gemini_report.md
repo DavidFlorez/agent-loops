@@ -28,10 +28,10 @@ Generated programmatically from cached public trajectories (`yoonholee/terminalb
 
 | Harness | Step-Logged Models | Step Runs | Step-Run Pass | All-Trial Pass | Loop Runs (%) | Loop Step Share | Cost-Valid Runs | Loop $ Share | `gemini_cli` Fires | `openclaw_10` Fires |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `openhands` | gemini-2.5-flash, gemini-2.5-pro | 872 | 16.74% | 16.40% (890) | 511 (58.60%) | 13.04% | 3 | 76.50% | 8 | 50 |
-| `mini-swe-agent` | gemini-2.5-flash, gemini-2.5-pro | 867 | 22.15% | 21.60% (889) | 393 (45.33%) | 25.66% | 32 | 91.25% | 14 | 30 |
+| `openhands` | gemini-2.5-flash, gemini-2.5-pro | 872 | 16.74% | 16.40% (890) | 511 (58.60%) | 13.04% | 3 | n<100 | 8 | 50 |
+| `mini-swe-agent` | gemini-2.5-flash, gemini-2.5-pro | 867 | 22.15% | 21.60% (889) | 393 (45.33%) | 25.66% | 32 | n<100 | 14 | 30 |
 | `gemini-cli` | gemini-2.5-flash, gemini-2.5-pro | 787 | 19.44% | 33.52% (1,766) | 177 (22.49%) | 6.66% | 0 | n/a | 3 | 16 |
-| `terminus-2` | gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash-preview, gemini-3-pro-preview | 1,769 | 39.74% | 39.70% (1,771) | 203 (11.48%) | 3.44% | 16 | 16.11% | 13 | 8 |
+| `terminus-2` | gemini-2.5-flash, gemini-2.5-pro, gemini-3-flash-preview, gemini-3-pro-preview | 1,769 | 39.74% | 39.70% (1,771) | 203 (11.48%) | 3.44% | 16 | n<100 | 13 | 8 |
 | `terminus-3-3` | gemini-3.1-pro-preview | 431 | 74.25% | 74.83% (445) | 31 (7.19%) | 0.64% | 0 | n/a | 2 | 1 |
 
 ### 3B. Full Harness × Model Matrix (All 9,320 Gemini Trials)
@@ -41,10 +41,10 @@ Generated programmatically from cached public trajectories (`yoonholee/terminalb
 | `terminus-2` | `gemini-2.5-pro@gemini` | 442 | 32.81% | 697.8 | 442 | 51 (11.54%) | 2.49% | n/a |
 | `mini-swe-agent` | `gemini-2.5-pro@gemini` | 444 | 26.13% | 650.7 | 435 | 180 (41.38%) | 17.81% | n/a |
 | `gemini-cli` | `gemini-2.5-pro@gemini` | 437 | 19.68% | 865.6 | 381 | 109 (28.61%) | 5.98% | n/a |
-| `terminus-2` | `gemini-2.5-flash@gemini` | 439 | 17.08% | 719.4 | 438 | 66 (15.07%) | 4.61% | 16.11% |
-| `mini-swe-agent` | `gemini-2.5-flash@gemini` | 445 | 17.08% | 676.6 | 432 | 213 (49.31%) | 30.64% | 91.25% |
-| `openhands` | `gemini-2.5-flash@gemini` | 445 | 16.40% | 718.5 | 436 | 261 (59.86%) | 9.98% | 2.92% |
-| `openhands` | `gemini-2.5-pro@gemini` | 445 | 16.40% | 552.4 | 436 | 250 (57.34%) | 17.19% | 91.69% |
+| `terminus-2` | `gemini-2.5-flash@gemini` | 439 | 17.08% | 719.4 | 438 | 66 (15.07%) | 4.61% | n<100 |
+| `mini-swe-agent` | `gemini-2.5-flash@gemini` | 445 | 17.08% | 676.6 | 432 | 213 (49.31%) | 30.64% | n<100 |
+| `openhands` | `gemini-2.5-flash@gemini` | 445 | 16.40% | 718.5 | 436 | 261 (59.86%) | 9.98% | n<100 |
+| `openhands` | `gemini-2.5-pro@gemini` | 445 | 16.40% | 552.4 | 436 | 250 (57.34%) | 17.19% | n<100 |
 | `gemini-cli` | `gemini-2.5-flash@gemini` | 439 | 15.49% | 576.0 | 406 | 68 (16.75%) | 7.51% | n/a |
 | `sage` | `gemini-3-pro-preview@Google` | 445 | 65.17% | 481.6 | 0 | n/a (no steps) | n/a | n/a |
 | `ante` | `gemini-3-pro-preview@Google` | 444 | 64.86% | 504.5 | 0 | n/a (no steps) | n/a | n/a |

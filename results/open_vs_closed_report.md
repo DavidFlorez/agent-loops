@@ -23,7 +23,7 @@ Generated programmatically from cached public trajectories (`yoonholee/terminalb
 | SWE-rebench (`agentic_system` 4 harnesses) — **Closed** | 2,220 | 57.97% | 718 (32.34%) | 3.05% | 50.7 / 92 | 752 | $2.21 | 4.32% |
 | SWE-rebench (All 17) — **Closed (10)** | 5,550 | 58.63% | 1,718 (30.95%) | 1.95% | 47.5 / 90 | 3,192 | $1.67 | 2.10% |
 
-> **Methodological note on Terminal-Bench Closed cost share (`34.11%`)**: Only `800 / 22,519` Closed TB runs survived the `[0.50x, 2.00x]` cost-rebuild validation (newer Gemini-3, GPT-5.2, and RSC-pointer runs had `cost_cents=0` or missing tokens), leaving an older subset dominated by `claude-opus-4-1` and `gemini-2.5-flash`. On SWE-rebench (`swelike` controlled), where both cohorts have high cost coverage (`3,652` Open vs `2,440` Closed), Open models spend **4.75%** of dollars on loops vs **1.11%** for Closed.
+> **Methodological note on Terminal-Bench Closed cost share (`34.11%`)**: Only `800 / 22,519` Closed TB runs survived the `[0.50x, 2.00x]` cost-rebuild validation (newer Gemini-3, GPT-5.2, and RSC-pointer runs had `cost_cents=0` or missing tokens), leaving an older subset dominated by `claude-opus-4-1` and `gemini-2.5-flash`. Cells with `<100` cost-valid runs are suppressed as `n<100`. On SWE-rebench (`swelike` controlled), where both cohorts have high cost coverage (`3,652` Open vs `2,440` Closed), Open models spend **4.75%** of dollars on loops vs **1.11%** for Closed.
 
 ## 3. Controlled Same-Harness Comparisons (Eliminating Scaffold Confounding)
 
@@ -34,7 +34,7 @@ Generated programmatically from cached public trajectories (`yoonholee/terminalb
 | `terminus-2` | Open-Weights | 8,003 | 27.28% | 2,557 (31.95%) | 8.59% | 33.9 / 20 | 2,968 | 15.54% |
 | `terminus-2` | Closed | 7,938 | 37.73% | 1,027 (12.94%) | 3.05% | 17.3 / 10 | 299 | 4.42% |
 | `openhands` | Open-Weights | 1,730 | 26.82% | 1,316 (76.07%) | 14.76% | 54.1 / 41 | 417 | 15.39% |
-| `openhands` | Closed | 4,325 | 29.62% | 2,199 (50.84%) | 6.27% | 48.5 / 28 | 47 | 87.96% |
+| `openhands` | Closed | 4,325 | 29.62% | 2,199 (50.84%) | 6.27% | 48.5 / 28 | 47 | n<100 |
 | `mini-swe-agent` | Open-Weights | 1,770 | 8.81% | 543 (30.68%) | 18.02% | 9.5 / 5 | 826 | 41.48% |
 | `mini-swe-agent` | Closed | 4,725 | 28.80% | 1,573 (33.29%) | 13.12% | 25.7 / 15 | 438 | 26.72% |
 

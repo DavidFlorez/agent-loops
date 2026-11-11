@@ -161,3 +161,98 @@ All four public datasets are cached locally under gitignored `data/`:
 4. **`first_party_only`**: Retains `first_party` API routes only (and explicitly marks cohorts where Open models only ran via third-party gateways).
 5. **`per_family`**: Model-family breakdown (`claude`, `gpt`, `gemini`, `grok`, `qwen`, `glm`, `minimax`, `deepseek`, `kimi`, `gpt_oss`, `inkling`, `mimo`) across every cohort.
 
+---
+
+## Phase 3: Precision Audit, Run-Length Control, Two-Stage Bootstrap & Harness Spread
+
+### 1. Labeler Precision Audit (`audit/flagged_samples.md` & `results/strict_vs_default_labeler.csv`)
+- **40-Trajectory Stratified Audit (`seed=42`)**: Sampled 10 Open `swelike`, 10 Closed `swelike` (SWE-rebench), 10 Open `terminus-2`, and 10 Closed `terminus-2` (Terminal-Bench) flagged loop runs in [`audit/flagged_samples.md`](audit/flagged_samples.md) with 2 steps of context on each side.
+- **Strict Labeler Sensitivity Check (`label_trajectory_strict`)**: Retains only `exact_loop` repeated `>=3` consecutive steps, `aba_thrash` (`>=3` cycles), and `period_k_rotation`, dropping single consecutive repeats, `near_duplicate`, `redundant_reread`, and `error_streak`.
+
+| Cohort | Metric | Default Open vs Closed (Unmatched) | Default Matched Gap [95% CI] | Strict Open vs Closed (Unmatched) | Strict Matched Gap [95% CI] |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `tb_terminus_2` | `loops_per_100_steps` | 6.91 vs 2.69 | +4.20 [+2.87, +5.46] | 1.12 vs 0.67 | +0.52 [+0.05, +1.00] |
+| `tb_terminus_2` | `any_loop_rate` | 28.99% vs 12.73% | +16.93 [+14.02, +19.92] | 2.17% vs 0.97% | +1.19 [+0.60, +1.83] |
+| `swe_rebench_swelike` | `loops_per_100_steps` | 5.71 vs 0.98 | +2.54 [+2.30, +2.78] | 0.13 vs 0.02 | +0.04 [+0.00, +0.09] |
+| `swe_rebench_swelike` | `any_loop_rate` | 89.32% vs 30.03% | +54.71 [+51.85, +57.89] | 3.42% vs 0.57% | +0.62 [+0.05, +1.33] |
+
+- **Read-Only Exact-Loop Share (`results/readonly_exact_loops.csv`)**:
+
+| Cohort | Weights | Exact-Loop Steps | Read-Only Exact-Loop Steps | Read-Only Share (%) |
+| --- | --- | ---: | ---: | ---: |
+| `swe_rebench_swelike` | **Open** | 12,603 | 6,003 | **47.6%** |
+| `swe_rebench_swelike` | **Closed** | 501 | 244 | **48.7%** |
+| `tb_terminus_2` | **Open** | 17,149 | 1,884 | **11.0%** |
+| `tb_terminus_2` | **Closed** | 2,789 | 512 | **18.4%** |
+| `longtail_swe_swelike` | **Open** | 7,989 | 2,821 | **35.3%** |
+| `longtail_swe_swelike` | **Closed** | 155 | 1 | **0.6%** |
+
+### 2. Run-Length Control & Step-Decile Matching (`results/length_matched_comparison.csv`)
+- Controlling for `log(steps)` in run-level Logistic regression reduces the `swe_rebench_swelike` Open-vs-Closed Any-Loop Odds Ratio from **8.43 (`p=0.0005`)** to **1.34 (`p=0.58`)** and the pooled 7-cohort OR from **2.25 (`p=0.024`)** to **1.47 (`p=0.25`)**.
+
+| Cohort | Open vs Closed Mean Steps | Unmatched Gap | Skill-Matched Gap | Length-Decile Matched Gap [95% CI] | Skill+Length Matched Gap [95% CI] |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `tb_terminus_2` | 33.1 vs 17.1 | +4.22 | +4.20 | +1.08 [+0.68, +1.47] | +0.99 [+0.62, +1.29] |
+| `tb_openhands` | 54.1 vs 48.6 | +7.11 | +6.86 | +3.63 [+2.49, +4.94] | +0.49 [-0.69, +1.78] |
+| `tb_mini_swe_agent` | 9.5 vs 25.7 | +8.08 | +0.50 | +6.28 [+4.94, +7.56] | +4.37 [+2.91, +5.80] |
+| `swe_rebench_swelike` | 94.7 vs 45.4 | +4.73 | +2.54 | +4.27 [+3.95, +4.58] | +0.77 [+0.50, +1.02] |
+| `longtail_swe_swelike` | 200.2 vs 47.4 | +2.45 | +0.08 | +2.88 [+2.48, +3.30] | -0.50 [-0.86, -0.25] |
+| `tau2_classic` | 13.6 vs 13.9 | -0.34 | -0.32 | -0.21 [-0.34, -0.04] | -0.17 [-0.30, -0.02] |
+| `tau2_banking_knowledge_alltools` | 38.1 vs 35.0 | -1.13 | +0.82 | -0.66 [-2.37, +0.36] | +0.62 [+0.22, +1.01] |
+
+### 3. `tau2_classic` IRR Collinearity Diagnosis (`results/tau2_classic_irr_diagnosis.json`) & Cohort Verdicts (`results/cohort_verdicts.csv`)
+- **Why `tau2_classic` had NB IRR `0.03` vs raw ratio `0.56`**: Complete separation on release_months + small N_open=2: both Open models (glm-5-think, qwen3.5-397b) were released in 2026-02 (month=13), whereas all 6 Closed models were released in 2025-09..2025-12 (months 8..11). Within Closed models, Dec-2025 releases (gemini-3-flash=1.92, gpt-5-2=1.20) looped much more than Sep/Nov-2025 Claude releases (0.15-0.17), driving the release_months slope to IRR=3.11/month (3.11^3 = 30x over 3 months) and forcing the collinear is_open_weight indicator down to IRR=0.03 to fit the 2 Open models at month=13. Dropping the collinear release_months_c covariate restores NB IRR to 0.60 (p=0.3920), matching the raw rate ratio (0.56).
+
+| Cohort | Matched Gap | 1-Stage Task CI | 2-Stage (Model+Task) CI | Raw Ratio [95% CI] | NB Adj IRR (p) | Status | 1-Stage Verdict | 2-Stage Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | :---: | --- | --- |
+| `tb_terminus_2` | +4.20 | [+2.86, +5.49] | [+1.44, +6.88] | 2.57 [1.17, 5.64] | 1.56 (0.3266) | `reliable` | **mixed** | **mixed** |
+| `tb_openhands` | +6.86 | [+3.79, +10.08] | [+1.40, +12.43] | 1.93 [1.28, 3.01] | 1.77 (0.0272) | `reliable` | **higher for open** | **higher for open** |
+| `tb_mini_swe_agent` | +0.50 | [-10.21, +12.85] | [-17.45, +26.66] | 1.68 [0.65, 4.10] | 1.01 (0.9503) | `reliable` | **null** | **null** |
+| `swe_rebench_swelike` | +2.54 | [+2.30, +2.78] | [+2.04, +3.05] | 5.84 [3.57, 9.48] | 2.69 (0.0014) | `reliable` | **higher for open** | **higher for open** |
+| `longtail_swe_swelike` | +0.08 | [-0.22, +0.36] | [-0.54, +0.69] | 3.55 [1.41, 8.41] | 1.08 (0.7974) | `reliable` | **null** | **null** |
+| `tau2_classic` | -0.32 | [-0.59, -0.04] | [-1.15, +0.35] | 0.56 [0.22, 2.16] | 0.03 (0.0167) | `unreliable` | **mixed** | **null** |
+| `tau2_banking_knowledge_alltools` | +0.82 | [+0.38, +1.42] | [-0.14, +1.79] | 0.70 [0.33, 1.55] | 0.90 (0.8368) | `reliable` | **mixed** | **null** |
+
+### 4. Same Model, Different Harness (`results/same_model_across_harness.csv`)
+- Evaluated multi-scaffold models across Terminal-Bench and SWE-rebench on shared tasks.
+
+| Dataset | Canonical Model | Weights | Harnesses Compared | Spread (Loops/100 Steps) | Max/Min Ratio |
+| --- | --- | --- | --- | ---: | ---: |
+| `terminalbench` | `gemini-2.5-flash` | Closed | `terminus-2` (4.64), `gemini-cli` (7.51), `openhands` (10.01), `mini-swe-agent` (30.72) | **26.08** | 6.6x |
+| `terminalbench` | `gpt-oss-20b` | Open | `terminus-2` (3.61), `mini-swe-agent` (27.92) | **24.31** | 7.7x |
+| `terminalbench` | `gpt-5-nano` | Closed | `codex` (1.33), `openhands` (5.51), `terminus-2` (14.58), `mini-swe-agent` (20.31) | **18.98** | 15.3x |
+| `terminalbench` | `gemini-2.5-pro` | Closed | `terminus-2` (2.51), `gemini-cli` (5.98), `openhands` (17.08), `mini-swe-agent` (17.78) | **15.27** | 7.1x |
+| `terminalbench` | `grok-code-fast-1` | Closed | `terminus-2` (1.85), `mini-swe-agent` (13.12) | **11.27** | 7.1x |
+| `terminalbench` | `claude-opus-4.1` | Closed | `terminus-2` (1.03), `claude-code` (2.07), `mini-swe-agent` (8.15), `openhands` (11.27) | **10.23** | 10.9x |
+| `terminalbench` | `grok-4` | Closed | `terminus-2` (0.49), `openhands` (8.82), `mini-swe-agent` (9.11) | **8.62** | 18.5x |
+| `terminalbench` | `gpt-oss-120b` | Open | `terminus-2` (4.57), `mini-swe-agent` (12.05) | **7.48** | 2.6x |
+| `terminalbench` | `claude-haiku-4.5` | Closed | `openhands` (1.65), `claude-code` (2.27), `terminus-2` (3.83), `mini-swe-agent` (8.30) | **6.65** | 5.0x |
+| `terminalbench` | `gpt-5` | Closed | `terminus-2` (0.81), `mini-swe-agent` (1.10), `codex` (2.20), `openhands` (7.12) | **6.31** | 8.8x |
+| `swe_rebench` | `claude-fable-5` | Closed | `swelike` (0.71), `claude-code` (6.41) | **5.69** | 9.0x |
+| `terminalbench` | `gpt-5-mini` | Closed | `codex` (1.88), `terminus-2` (3.49), `openhands` (3.60), `mini-swe-agent` (7.50) | **5.62** | 4.0x |
+| `terminalbench` | `gpt-5-codex` | Closed | `terminus-2` (0.95), `codex` (2.96), `mini-swe-agent` (6.29) | **5.34** | 6.6x |
+| `terminalbench` | `claude-sonnet-4.5` | Closed | `claude-code` (2.21), `terminus-2` (2.34), `openhands` (5.23), `mini-swe-agent` (6.90) | **4.69** | 3.1x |
+| `terminalbench` | `claude-opus-4.5` | Closed | `terminus-2` (2.63), `claude-code` (2.90), `openhands` (6.26) | **3.63** | 2.4x |
+| `terminalbench` | `kimi-k2-0905` | Open | `terminus-2` (9.94), `openhands` (13.50) | **3.55** | 1.4x |
+| `terminalbench` | `qwen3-coder-480b` | Open | `terminus-2` (13.35), `openhands` (16.03) | **2.68** | 1.2x |
+| `terminalbench` | `minimax-m2.1` | Open | `claude-code` (2.00), `terminus-2` (3.84) | **1.84** | 1.9x |
+| `swe_rebench` | `gpt-5.6-sol` | Closed | `swelike` (0.85), `codex` (2.24) | **1.39** | 2.6x |
+| `terminalbench` | `claude-opus-4.6` | Closed | `claude-code` (1.13), `terminus-2` (1.26), `terminus-3-3` (1.28), `judy` (1.75) | **0.61** | 1.5x |
+| `swe_rebench` | `grok-4.5` | Closed | `junie` (0.38), `swelike` (0.65) | **0.28** | 1.7x |
+
+### 5. Terminal-Bench Cost Rebuild Audit (`audit/tb_cost_rebuild_audit.md`) & Top-10 Null-Step Models (`results/tb_null_step_models.csv`)
+- **Cost Rebuild Mismatch Diagnosis**: Out of `34,462` step-logged TB rows (`29,554` priced runs with `cost_cents > 0`), `5,011` passed `[0.50x, 2.00x]` validation (`4,211` Open vs **`800` Closed**), `4,408` lacked positive `cost_cents`, and `24,543` failed `[0.50x, 2.00x]` (`23,076` with Next.js RSC `$<hex>` truncation). Confirmed zero `cost_cents / 100` or `cache_tokens` double-counting bugs.
+- **Top-10 Terminal-Bench Models with `0` Step Traces (among `17,642` null/empty-step rows)**:
+
+| Rank | Model | Weights | Harnesses | Total Trials | Task Pass Rate (%) |
+| ---: | --- | --- | --- | ---: | ---: |
+| 1 | `gpt-5.3-codex@openai` | Closed | `Factory Droid, mux, simple_codex, terminus-2` | 1,778 | **71.37%** |
+| 2 | `gpt-5.3-codex@OpenAI` | Closed | `ruley` | 445 | **70.34%** |
+| 3 | `gemini-3-pro-preview@Google` | Closed | `ante, ruley, sage` | 1,334 | **64.09%** |
+| 4 | `gpt-5.1-codex-max@openai` | Closed | `codex` | 445 | **60.45%** |
+| 5 | `gemini-3-pro-preview@google` | Closed | `Factory Droid, letta-code` | 890 | **58.54%** |
+| 6 | `claude-opus-4-5@anthropic` | Closed | `goose, letta-code, mux, opencode` | 1,065 | **56.34%** |
+| 7 | `gemini-3-flash-preview@google` | Closed | `gemini-cli` | 445 | **51.01%** |
+| 8 | `gemini-3-flash-preview@Google` | Closed | `gemini-cli` | 445 | **47.42%** |
+| 9 | `claude-sonnet-4-5@anthropic` | Closed | `TerminalBenchAgent, goose` | 890 | **44.83%** |
+| 10 | `kimi-k2.5@kimi` | Open | `terminus-2` | 435 | **43.45%** |
