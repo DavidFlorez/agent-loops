@@ -76,10 +76,7 @@ def main() -> None:
 
     # 2. Terminal-Bench 2.0 analysis (with optional Parquet resume cache)
     t0 = time.perf_counter()
-    if cache_dir is not None:
-        tb_records, tb_drops = load_or_analyze_dataset("terminalbench", cache_dir, analyze_terminalbench, data_dir)
-    else:
-        tb_records, tb_drops = analyze_terminalbench(data_dir)
+    tb_records, tb_drops = load_or_analyze_dataset("terminalbench", analyze_terminalbench, data_dir, cache_dir)
     tb_by_model = aggregate_group_metrics(tb_records, "model")
     tb_by_harness = aggregate_group_metrics(tb_records, "harness")
     tb_detectors, tb_budgets = evaluate_all_detectors(tb_records, n_seeds=200, seed=42)
@@ -89,10 +86,7 @@ def main() -> None:
 
     # 3. SWE-rebench July 2026 analysis (with optional Parquet resume cache)
     t0 = time.perf_counter()
-    if cache_dir is not None:
-        swe_records, swe_drops = load_or_analyze_dataset("swe_rebench", cache_dir, analyze_swe_rebench, data_dir)
-    else:
-        swe_records, swe_drops = analyze_swe_rebench(data_dir)
+    swe_records, swe_drops = load_or_analyze_dataset("swe_rebench", analyze_swe_rebench, data_dir, cache_dir)
     swe_by_model = aggregate_group_metrics(swe_records, "model")
     swe_by_harness = aggregate_group_metrics(swe_records, "harness")
     swe_detectors, swe_budgets = evaluate_all_detectors(swe_records, n_seeds=200, seed=42)
@@ -102,12 +96,8 @@ def main() -> None:
     # 4. Legacy tau2-bench sanity check + Longtail-SWE + Sierra public S3 archive
     t0 = time.perf_counter()
     tau2_summary = analyze_tau2(data_dir)
-    if cache_dir is not None:
-        longtail_records, longtail_counts = load_or_analyze_dataset("longtail_swe", cache_dir, analyze_longtail_swe, data_dir)
-        sierra_records, sierra_counts = load_or_analyze_dataset("sierra_tau2", cache_dir, analyze_sierra_tau2, data_dir)
-    else:
-        longtail_records, longtail_counts = analyze_longtail_swe(data_dir)
-        sierra_records, sierra_counts = analyze_sierra_tau2(data_dir)
+    longtail_records, longtail_counts = load_or_analyze_dataset("longtail_swe", analyze_longtail_swe, data_dir, cache_dir)
+    sierra_records, sierra_counts = load_or_analyze_dataset("sierra_tau2", analyze_sierra_tau2, data_dir, cache_dir)
     timings["longtail_and_sierra_s"] = round(time.perf_counter() - t0, 2)
     print(
         f"[stage 4] Longtail ({len(longtail_records):,}) + Sierra S3 ({len(sierra_records):,}) "
