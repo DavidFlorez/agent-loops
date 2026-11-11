@@ -121,12 +121,20 @@ def write_results_and_summary(
     tb_det_df = pd.DataFrame([asdict(d) for d in tb_detectors])
     swe_det_df = pd.DataFrame([asdict(d) for d in swe_detectors])
 
-    tb_by_model.to_csv(results_dir / "tb_by_model.csv", index=False)
-    tb_by_harness.to_csv(results_dir / "tb_by_harness.csv", index=False)
+    def _suppress_thin_cost_csv(df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        if "cost_runs" in out.columns and "loop_dollar_share" in out.columns:
+            out["loop_dollar_share"] = out["loop_dollar_share"].astype(object)
+            mask = (out["cost_runs"] > 0) & (out["cost_runs"] < 100)
+            out.loc[mask, "loop_dollar_share"] = "n<100"
+        return out
+
+    _suppress_thin_cost_csv(tb_by_model).to_csv(results_dir / "tb_by_model.csv", index=False)
+    _suppress_thin_cost_csv(tb_by_harness).to_csv(results_dir / "tb_by_harness.csv", index=False)
     tb_det_df.to_csv(results_dir / "tb_detectors.csv", index=False)
 
-    swe_by_model.to_csv(results_dir / "swe_by_model.csv", index=False)
-    swe_by_harness.to_csv(results_dir / "swe_by_harness.csv", index=False)
+    _suppress_thin_cost_csv(swe_by_model).to_csv(results_dir / "swe_by_model.csv", index=False)
+    _suppress_thin_cost_csv(swe_by_harness).to_csv(results_dir / "swe_by_harness.csv", index=False)
     swe_det_df.to_csv(results_dir / "swe_detectors.csv", index=False)
 
     loop_prone_tasks.to_csv(results_dir / "loop_prone_tasks.csv", index=False)

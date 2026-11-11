@@ -615,7 +615,7 @@ def plot_hero_raw_vs_controlled(
     regressions: dict[str, Any],
     out_path: Path,
 ) -> None:
-    """1600x900 px hero figure: SWE-rebench Open-vs-Closed gap at 3 control stages + strict labeler check."""
+    """1600x900 px hero figure: SWE-rebench Open-vs-Closed gap at 5 control stages + run-length OR control."""
     swe_len = length_matched_df[length_matched_df["cohort"] == "swe_rebench_swelike"]
     swe_2s = two_stage_df[two_stage_df["cohort"] == "swe_rebench_swelike"]
     swe_str = strict_comp_df[
@@ -666,7 +666,7 @@ def plot_hero_raw_vs_controlled(
     y_pos = np.arange(len(stage_labels))[::-1]
     colors = ["#d95f02", "#e6550d", "#fd8d3c", "#fdae6b", "#756bb1"][: len(stage_labels)]
 
-    ax.barh(y_pos, pts, height=0.52, color=colors, edgecolor="#222222", linewidth=1.2, alpha=0.90)
+    ax.barh(y_pos, pts, height=0.50, color=colors, edgecolor="#222222", linewidth=1.2, alpha=0.90)
     for yp, pt, lo, hi in zip(y_pos, pts, ci_lo, ci_hi):
         if not np.isnan(lo) and not np.isnan(hi) and hi >= lo:
             ax.errorbar(
@@ -680,34 +680,34 @@ def plot_hero_raw_vs_controlled(
                 zorder=5,
             )
             label_txt = f"{pt:+.2f} [{lo:+.2f}, {hi:+.2f}]"
-            x_txt = max(pt, hi) + 0.08
+            x_txt = max(pt, hi) + 0.10
         else:
             label_txt = f"{pt:+.2f}"
-            x_txt = pt + 0.08
-        ax.text(x_txt, yp, label_txt, va="center", ha="left", fontsize=13, fontweight="bold", color="#111111")
+            x_txt = pt + 0.10
+        ax.text(x_txt, yp, label_txt, va="center", ha="left", fontsize=12.5, fontweight="bold", color="#111111")
 
     if r_2s is not None:
         tw_lo = float(r_2s["new_twostage_ci_low"])
         tw_hi = float(r_2s["new_twostage_ci_high"])
         yp_skill = y_pos[1]
-        ax.plot([tw_lo, tw_hi], [yp_skill - 0.18, yp_skill - 0.18], color="#1f78b4", lw=4.0, zorder=6)
+        ax.plot([tw_lo, tw_hi], [yp_skill - 0.22, yp_skill - 0.22], color="#1f78b4", lw=4.0, zorder=6)
         ax.text(
-            tw_hi + 0.08,
-            yp_skill - 0.22,
+            tw_lo,
+            yp_skill - 0.28,
             f"2-Stage (model+task) CI: [{tw_lo:+.2f}, {tw_hi:+.2f}]",
             va="top",
             ha="left",
-            fontsize=11.5,
+            fontsize=11.0,
             color="#1f78b4",
             fontweight="bold",
         )
 
     ax.axvline(0.0, color="#222222", linestyle="--", linewidth=1.5)
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(stage_labels, fontsize=13.5, fontweight="bold")
-    ax.set_xlabel("Open minus Closed Loops per 100 Steps", fontsize=14, fontweight="bold")
-    ax.set_title("A. SWE-rebench Loop Density Gap Across Controls", fontsize=16, fontweight="bold", pad=12)
-    ax.set_xlim(-0.5, max(ci_hi) + 1.8)
+    ax.set_yticklabels(stage_labels, fontsize=13, fontweight="bold")
+    ax.set_xlabel("Open minus Closed Loops per 100 Steps", fontsize=13.5, fontweight="bold")
+    ax.set_title("A. SWE-rebench Loop Density Gap Across Controls", fontsize=15.5, fontweight="bold", pad=12)
+    ax.set_xlim(-0.3, max(ci_hi) + 3.4)
     ax.tick_params(axis="x", labelsize=12.5)
     ax.grid(True, axis="x", linestyle=":", alpha=0.5)
 
@@ -721,10 +721,10 @@ def plot_hero_raw_vs_controlled(
     pool_lgs = ((pool_reg.get("logit_with_steps") or {}).get("coefs") or {}).get("is_open_weight", {})
 
     or_labels = [
-        "SWE-rebench Logit\n(No Step-Count Control)",
-        "SWE-rebench Logit + log(steps)\n(Controlled for Run Length)",
-        "Pooled 7-Cohort Logit\n(No Step-Count Control)",
-        "Pooled 7-Cohort Logit + log(steps)\n(Controlled for Run Length)",
+        "SWE-rebench Logit\n(No Length Control)",
+        "SWE-rebench Logit\n(+ log(steps) Control)",
+        "Pooled 7-Cohort Logit\n(No Length Control)",
+        "Pooled 7-Cohort Logit\n(+ log(steps) Control)",
     ]
     or_dicts = [swe_lg, swe_lgs, pool_lg, pool_lgs]
     y2 = np.arange(len(or_labels))[::-1]
@@ -738,10 +738,11 @@ def plot_hero_raw_vs_controlled(
         hi = float(d["ci_high"])
         pval = float(d["p"])
         ax2.barh(yp, val - 1.0, left=1.0, height=0.46, color=col, edgecolor="#222222", linewidth=1.2, alpha=0.88)
+        hi_cap = min(hi, 12.2)
         ax2.errorbar(
             val,
             yp,
-            xerr=[[max(0.0, val - lo)], [max(0.0, min(hi, 13.5) - val)]],
+            xerr=[[max(0.0, val - lo)], [max(0.0, hi_cap - val)]],
             fmt="o",
             color="#111111",
             ecolor="#111111",
@@ -750,41 +751,51 @@ def plot_hero_raw_vs_controlled(
             markersize=7,
         )
         sig_str = f"OR = {val:.2f} (p={pval:.3f})"
-        ax2.text(max(val, min(hi, 12.0)) + 0.25, yp, sig_str, va="center", ha="left", fontsize=13, fontweight="bold")
+        ax2.text(max(val, hi_cap) + 0.30, yp, sig_str, va="center", ha="left", fontsize=12.5, fontweight="bold")
 
     ax2.axvline(1.0, color="#222222", linestyle="--", linewidth=1.8, label="No Difference (OR = 1.0)")
     ax2.set_yticks(y2)
-    ax2.set_yticklabels(or_labels, fontsize=13.5, fontweight="bold")
-    ax2.set_xlim(0.0, 15.5)
-    ax2.set_xlabel("Odds Ratio (OR) for Having >=1 Loop in a Run", fontsize=14, fontweight="bold")
-    ax2.set_title("B. Why More Open Runs Flag a Loop: Longer Trajectories", fontsize=16, fontweight="bold", pad=12)
+    ax2.set_yticklabels(or_labels, fontsize=13, fontweight="bold")
+    ax2.set_xlim(0.0, 20.5)
+    ax2.set_xlabel("Odds Ratio (OR) for Having >=1 Loop in a Run", fontsize=13.5, fontweight="bold")
+    ax2.set_title("B. Why More Open Runs Flag a Loop: Longer Trajectories", fontsize=15.5, fontweight="bold", pad=12)
     ax2.tick_params(axis="x", labelsize=12.5)
     ax2.grid(True, axis="x", linestyle=":", alpha=0.5)
 
+    swe_or1 = float(swe_lg.get("irr_or", 8.43))
+    swe_p1 = float(swe_lg.get("p", 0.022))
+    swe_or2 = float(swe_lgs.get("irr_or", 1.34))
+    swe_p2 = float(swe_lgs.get("p", 0.492))
+    pool_or1 = float(pool_lg.get("irr_or", 2.25))
+    pool_p1 = float(pool_lg.get("p", 0.024))
+    pool_or2 = float(pool_lgs.get("irr_or", 1.47))
+    pool_p2 = float(pool_lgs.get("p", 0.248))
+
     note_txt = (
-        f"SWE-rebench Open models take {float(r_len['open_mean_steps']):.1f} steps/run vs "
-        f"{float(r_len['closed_mean_steps']):.1f} for Closed (+{(float(r_len['open_mean_steps'])/float(r_len['closed_mean_steps'])-1)*100:.0f}% longer).\n"
-        "Controlling for log(steps) collapses SWE-rebench Any-Loop OR from 8.43 (p<0.001) to 1.34 (p=0.58, non-significant),\n"
-        "and Pooled Any-Loop OR from 2.25 (p=0.024) to 1.47 (p=0.25, non-significant)."
+        f"SWE-rebench Open models average {float(r_len['open_mean_steps']):.1f} steps/run vs "
+        f"{float(r_len['closed_mean_steps']):.1f} for Closed ({float(r_len['open_mean_steps'])/float(r_len['closed_mean_steps']):.2f}x longer). "
+        f"Controlling for log(steps) collapses SWE-rebench Any-Loop OR from {swe_or1:.2f} (p={swe_p1:.3f}) to {swe_or2:.2f} (p={swe_p2:.2f}, NS) "
+        f"and Pooled 7-Cohort OR from {pool_or1:.2f} (p={pool_p1:.3f}) to {pool_or2:.2f} (p={pool_p2:.2f}, NS)."
     )
-    ax2.text(
+    fig.text(
+        0.5,
         0.02,
-        0.04,
         note_txt,
-        transform=ax2.transAxes,
-        fontsize=11.5,
+        fontsize=12,
         va="bottom",
-        ha="left",
-        bbox=dict(boxstyle="round,pad=0.5", facecolor="#f0f4f8", edgecolor="#2b8cbe", linewidth=1.5),
+        ha="center",
+        fontweight="bold",
+        color="#111111",
+        bbox=dict(boxstyle="round,pad=0.45", facecolor="#f0f4f8", edgecolor="#2b8cbe", linewidth=1.4),
     )
 
     fig.suptitle(
         "SWE-rebench Open vs Closed Loop Gap: Raw vs Skill, Run-Length & Labeler Controls",
-        fontsize=20,
+        fontsize=19.5,
         fontweight="bold",
         y=0.97,
     )
-    fig.subplots_adjust(left=0.21, right=0.97, top=0.86, bottom=0.11, wspace=0.42)
+    fig.subplots_adjust(left=0.19, right=0.98, top=0.86, bottom=0.16, wspace=0.44)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=100)
     plt.close(fig)
@@ -827,17 +838,23 @@ def plot_cohort_verdicts(
             hi2 = float(row["twostage_boot_matched_ci_high"])
             is_unmatched_fallback = False
 
+        # Clip visual error-bar extents at [-9.5, 13.0] so wide CIs do not collide with right-hand callout text
+        lo1_vis = max(lo1, -9.5)
+        hi1_vis = min(hi1, 13.0)
+        lo2_vis = max(lo2, -9.5)
+        hi2_vis = min(hi2, 13.0)
+
         # Outer 2-stage (model + task) CI bar
-        if not np.isnan(lo2) and not np.isnan(hi2) and hi2 > lo2:
-            ax.plot([lo2, hi2], [idx, idx], color=col, linewidth=3.0, alpha=0.45, zorder=3)
-            ax.plot([lo2, lo2], [idx - 0.14, idx + 0.14], color=col, linewidth=2.2, alpha=0.55, zorder=3)
-            ax.plot([hi2, hi2], [idx - 0.14, idx + 0.14], color=col, linewidth=2.2, alpha=0.55, zorder=3)
+        if not np.isnan(lo2_vis) and not np.isnan(hi2_vis) and hi2_vis > lo2_vis:
+            ax.plot([lo2_vis, hi2_vis], [idx, idx], color=col, linewidth=3.0, alpha=0.45, zorder=3)
+            ax.plot([lo2_vis, lo2_vis], [idx - 0.14, idx + 0.14], color=col, linewidth=2.2, alpha=0.55, zorder=3)
+            ax.plot([hi2_vis, hi2_vis], [idx - 0.14, idx + 0.14], color=col, linewidth=2.2, alpha=0.55, zorder=3)
 
         # Inner 1-stage (task-only) CI bar + point marker
         ax.errorbar(
             pt,
             idx,
-            xerr=[[max(0.0, pt - lo1)], [max(0.0, hi1 - pt)]],
+            xerr=[[max(0.0, pt - lo1_vis)], [max(0.0, hi1_vis - pt)]],
             fmt="D" if is_unmatched_fallback else "o",
             color=col,
             ecolor=col,
@@ -858,48 +875,56 @@ def plot_cohort_verdicts(
             irr_txt = f"Raw Ratio={float(row['raw_rate_ratio']):.2f}x (NB collinear)"
 
         ci_txt = f"[{lo1:+.2f}, {hi1:+.2f}]" if not is_unmatched_fallback else "(no band overlap)"
-        badge = f"{pt:+.2f} {ci_txt}  |  {irr_txt}  ->  {v_one.upper()}"
+        badge = f"{pt:+.2f} {ci_txt} | {irr_txt} -> {v_one.upper()}"
         if v_two != v_one:
             badge += f" (2-stage: {v_two.upper()})"
         ax.text(
-            8.2,
+            13.4,
             idx,
             badge,
             va="center",
             ha="left",
-            fontsize=12,
+            fontsize=11.5,
             fontweight="bold",
             color=col,
         )
 
-    short_names = {
-        "tb_terminus_2": "Terminal-Bench 2.0\n(terminus-2, 16O vs 16C)",
-        "swe_rebench_swelike": "SWE-rebench Jul 2026\n(swelike, 7O vs 6C)",
-        "longtail_swe_swelike": "Longtail-SWE\n(swelike, 5O vs 4C)*",
-        "tau2_banking_knowledge_alltools": "Sierra tau2 Banking\n(AllTools, 3O vs 17C)",
-        "tau2_classic": "Sierra tau2 Classic\n(Air/Ret/Tel, 2O vs 6C)",
-        "tb_openhands": "Terminal-Bench 2.0\n(openhands, 5O vs 7C)",
-        "tb_mini_swe_agent": "Terminal-Bench 2.0\n(mini-swe-agent, 5O vs 8C)",
+    base_names = {
+        "tb_terminus_2": "Terminal-Bench 2.0\n(terminus-2",
+        "swe_rebench_swelike": "SWE-rebench Jul 2026\n(swelike",
+        "longtail_swe_swelike": "Longtail-SWE\n(swelike",
+        "tau2_banking_knowledge_alltools": "Sierra tau2 Banking\n(AllTools",
+        "tau2_classic": "Sierra tau2 Classic\n(Air/Ret/Tel",
+        "tb_openhands": "Terminal-Bench 2.0\n(openhands",
+        "tb_mini_swe_agent": "Terminal-Bench 2.0\n(mini-swe-agent",
     }
+    y_labels = []
+    for _, r in df.iterrows():
+        ck = str(r["cohort"])
+        no = int(r["n_open_models"])
+        nc = int(r["n_closed_models"])
+        prefix = base_names.get(ck, str(r["cohort_label"]))
+        y_labels.append(f"{prefix}, {no}O vs {nc}C)")
+
     ax.set_yticks(y_pos)
-    ax.set_yticklabels([short_names.get(str(r["cohort"]), str(r["cohort_label"])) for _, r in df.iterrows()], fontsize=13, fontweight="bold")
-    ax.set_xlim(-3.0, 20.5)
-    ax.set_xlabel("Matched Open minus Closed Gap (Loops per 100 Executed Steps)", fontsize=14.5, fontweight="bold")
-    ax.tick_params(axis="x", labelsize=13)
+    ax.set_yticklabels(y_labels, fontsize=12.5, fontweight="bold")
+    ax.set_xlim(-10.2, 30.5)
+    ax.set_xlabel("Matched Open minus Closed Gap (Loops per 100 Executed Steps)", fontsize=14, fontweight="bold")
+    ax.tick_params(axis="x", labelsize=12.5)
     ax.grid(True, axis="x", linestyle=":", alpha=0.5)
 
     from matplotlib.lines import Line2D
     legend_handles = [
-        Line2D([0], [0], marker="o", color="#d95f02", lw=5, markersize=10, label="Higher for Open (CI > 0 & NB IRR > 1, p<0.05)"),
+        Line2D([0], [0], marker="o", color="#d95f02", lw=5, markersize=10, label="Higher for Open (Matched CI > 0 & NB IRR > 1, p<0.05)"),
         Line2D([0], [0], marker="o", color="#e6ab02", lw=5, markersize=10, label="Mixed (Matched CI != 0, but NB IRR p>=0.05 or collinear)"),
         Line2D([0], [0], marker="o", color="#666666", lw=5, markersize=10, label="Null (Matched CI includes 0 & NB IRR p>=0.05)"),
         Line2D([0], [0], color="#333333", lw=2.5, alpha=0.45, label="Thin Outer Cap = 2-Stage (Model + Task) Bootstrap 95% CI"),
     ]
-    ax.legend(handles=legend_handles, loc="upper left", fontsize=12, frameon=True, facecolor="#f8f9fa")
+    ax.legend(handles=legend_handles, loc="upper left", fontsize=11.5, frameon=True, facecolor="#f8f9fa")
     ax.text(
         0.01,
         0.02,
-        "*Longtail-SWE has 0 overlapping pass-rate bands (diamond shows unmatched gap); Verdict Rule requires both matched CI > 0 and reliable adjusted NB IRR > 1 (p<0.05).",
+        "Note: Pre-specified Verdict Rule requires both capability-matched 95% CI > 0 and reliable adjusted NB IRR > 1 (p<0.05). Wide CIs clipped visually at [-9.5, +13.0].",
         transform=ax.transAxes,
         fontsize=11.5,
         style="italic",
@@ -912,7 +937,7 @@ def plot_cohort_verdicts(
         fontweight="bold",
         y=0.96,
     )
-    fig.subplots_adjust(left=0.22, right=0.98, top=0.88, bottom=0.12)
+    fig.subplots_adjust(left=0.20, right=0.98, top=0.88, bottom=0.12)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=100)
     plt.close(fig)
@@ -927,10 +952,15 @@ def plot_detectors_vs_random_16x9(
     if tb_det_df.empty and swe_det_df.empty:
         return
 
+    tb_tot = int(tb_det_df["total_runs"].iloc[0]) if not tb_det_df.empty else 34462
+    tb_cost_n = int(tb_det_df["cost_eval_runs"].iloc[0]) if not tb_det_df.empty else 5011
+    swe_tot = int(swe_det_df["total_runs"].iloc[0]) if not swe_det_df.empty else 9435
+    swe_cost_n = int(swe_det_df["cost_eval_runs"].iloc[0]) if not swe_det_df.empty else 6844
+
     fig, axes = plt.subplots(1, 2, figsize=(16, 9), dpi=100, sharey=True)
     datasets = [
-        (tb_det_df, "A. Terminal-Bench 2.0 (34,462 Runs / 5,011 Priced)"),
-        (swe_det_df, "B. SWE-rebench Jul 2026 (9,435 Runs / 6,381 Priced)"),
+        (tb_det_df, f"A. Terminal-Bench 2.0 ({tb_tot:,} Runs / {tb_cost_n:,} Priced)", 64.0),
+        (swe_det_df, f"B. SWE-rebench Jul 2026 ({swe_tot:,} Runs / {swe_cost_n:,} Priced)", 122.0),
     ]
     rules_order = [
         ("gemini_cli", "Gemini-CLI\n(Tool/Chant Guard)"),
@@ -943,7 +973,7 @@ def plot_detectors_vs_random_16x9(
     y_base = np.arange(len(rules_order))[::-1]
     height = 0.34
 
-    for ax_i, (df_sub, ds_title) in enumerate(datasets):
+    for ax_i, (df_sub, ds_title, x_max) in enumerate(datasets):
         ax = axes[ax_i]
         if df_sub.empty:
             continue
@@ -959,13 +989,10 @@ def plot_detectors_vs_random_16x9(
             p_loss = float(row["success_loss_pp"])
 
             r_dol = float(row["rand_dollars_saved_pct_mean"]) * 100.0
-            r_dol_lo = float(row["rand_dollars_saved_pct_ci_low"]) * 100.0
-            r_dol_hi = float(row["rand_dollars_saved_pct_ci_high"]) * 100.0
             r_fsr = float(row["rand_false_stop_mean"]) * 100.0
             r_fsr_lo = float(row["rand_false_stop_ci_low"]) * 100.0
             r_fsr_hi = float(row["rand_false_stop_ci_high"]) * 100.0
 
-            # Plot False Stop Rate (% of stopped runs that would have succeeded) with 95% CIs on random baseline
             ax.barh(
                 yp + height / 2,
                 p_fsr,
@@ -973,12 +1000,12 @@ def plot_detectors_vs_random_16x9(
                 color="#2b8cbe",
                 edgecolor="#111111",
                 linewidth=1.2,
-                label="Production Guard (False-Stop Rate %)" if idx_r == 0 else None,
+                label="Production Loop Guard (False-Stop Rate %)" if (ax_i == 0 and idx_r == 0) else None,
             )
             ax.text(
                 p_fsr + 0.8,
                 yp + height / 2,
-                f"Guard FSR: {p_fsr:.1f}% (Pass lost: {p_loss:.2f}pp | $ saved: {p_dol:.2f}%)",
+                f"Guard: {p_fsr:.1f}% FSR | {p_dol:.2f}% $ (-{p_loss:.2f}pp)",
                 va="center",
                 ha="left",
                 fontsize=11.5,
@@ -994,7 +1021,7 @@ def plot_detectors_vs_random_16x9(
                 edgecolor="#111111",
                 linewidth=1.2,
                 alpha=0.85,
-                label="Matched Random Stopper (200-Seed 95% CI)" if idx_r == 0 else None,
+                label="Step-Matched Random Stopper (200-Seed 95% CI)" if (ax_i == 0 and idx_r == 0) else None,
             )
             ax.errorbar(
                 r_fsr,
@@ -1008,7 +1035,7 @@ def plot_detectors_vs_random_16x9(
             ax.text(
                 max(r_fsr, r_fsr_hi) + 0.8,
                 yp - height / 2,
-                f"Random FSR: {r_fsr:.1f}% [{r_fsr_lo:.1f}%, {r_fsr_hi:.1f}%] ($ saved: {r_dol:.2f}% [{r_dol_lo:.2f}%, {r_dol_hi:.2f}%])",
+                f"Rand: {r_fsr:.1f}% [{r_fsr_lo:.0f}-{r_fsr_hi:.0f}%] | {r_dol:.2f}% $",
                 va="center",
                 ha="left",
                 fontsize=11.5,
@@ -1018,29 +1045,40 @@ def plot_detectors_vs_random_16x9(
 
         ax.set_yticks(y_base)
         ax.set_yticklabels([r[1] for r in rules_order], fontsize=13.5, fontweight="bold")
-        ax.set_xlabel("False-Stop Rate (% of Triggered Stops That Killed a Passing Run)", fontsize=13.5, fontweight="bold")
-        ax.set_title(ds_title, fontsize=16, fontweight="bold", pad=12)
-        ax.set_xlim(0, 68)
+        ax.set_xlabel("False-Stop Rate (% of Triggered Stops That Killed a Passing Run)", fontsize=13, fontweight="bold")
+        ax.set_title(ds_title, fontsize=15.5, fontweight="bold", pad=12)
+        ax.set_xlim(0, x_max)
         ax.tick_params(axis="x", labelsize=12.5)
         ax.grid(True, axis="x", linestyle=":", alpha=0.5)
 
-    axes[0].legend(loc="lower right", fontsize=12, frameon=True, facecolor="#f8f9fa")
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            bbox_to_anchor=(0.55, 0.915),
+            ncol=2,
+            fontsize=12.5,
+            frameon=True,
+            facecolor="#f8f9fa",
+        )
     fig.suptitle(
         "Production Loop Detectors vs Step-Matched Random Stoppers (with 200-Seed 95% CIs)",
         fontsize=19.5,
         fontweight="bold",
-        y=0.96,
+        y=0.97,
     )
     fig.text(
         0.5,
         0.02,
-        "On Terminal-Bench, production guards cut false-stop rates in half (e.g., gemini_cli 10.8% vs 23.2% random) while saving more cache-aware dollars (5.71% vs 4.33% random).",
+        "On Terminal-Bench, production guards cut false-stop rates in half (gemini_cli 10.8% vs 23.2% random) while saving more cache-aware dollars (5.71% vs 4.33% random).",
         ha="center",
-        fontsize=13,
+        fontsize=12.5,
         fontweight="bold",
         color="#222222",
     )
-    fig.subplots_adjust(left=0.14, right=0.98, top=0.86, bottom=0.12, wspace=0.06)
+    fig.subplots_adjust(left=0.15, right=0.98, top=0.82, bottom=0.12, wspace=0.06)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=100)
     plt.close(fig)
@@ -1052,31 +1090,21 @@ def plot_glm52_vs_opus5(
     swe_by_model_df: pd.DataFrame,
     out_path: Path,
 ) -> None:
-    """1600x900 px comparison of SWE-rebench pass rate, cost/run, and loop rate for glm-5.2, opus-5, grok-4.5, gpt-5.6-sol."""
-    targets = ["glm-5.2", "opus-5", "grok-4.5", "gpt-5.6-sol"]
-    sub = model_df[(model_df["cohort"] == "swe_rebench_swelike") & (model_df["model"].isin(targets))].copy()
+    """1600x900 px comparison of SWE-rebench pass rate, cost/run, and loop rate for glm-5.2, claude-opus-5, grok-4.5, gpt-5.6-sol."""
+    targets = ["glm-5.2", "claude-opus-5", "grok-4.5", "gpt-5.6-sol"]
+    sub = model_df[(model_df["cohort"] == "swe_rebench_swelike") & (model_df["canonical_name"].isin(targets))].copy()
     if sub.empty:
         return
 
-    sub["order"] = sub["model"].map({m: i for i, m in enumerate(targets)})
+    sub["order"] = sub["canonical_name"].map({m: i for i, m in enumerate(targets)})
     sub = sub.sort_values("order").reset_index(drop=True)
 
-    strict_sub = strict_by_model_df[
-        (strict_by_model_df["cohort"] == "swe_rebench_swelike") & (strict_by_model_df["model"].isin(targets))
-    ].set_index("model")
-
-    swe_cost_map: dict[str, float] = {}
-    if not swe_by_model_df.empty and "group" in swe_by_model_df.columns:
-        for _, r in swe_by_model_df.iterrows():
-            c_runs = int(r.get("cost_runs", 0))
-            tot_c = float(r.get("total_cost_usd", 0.0))
-            if c_runs > 0:
-                swe_cost_map[str(r["group"])] = tot_c / c_runs
+    strict_sub = strict_by_model_df[strict_by_model_df["cohort"] == "swe_rebench_swelike"].set_index("model")
 
     fig, axes = plt.subplots(1, 3, figsize=(16, 9), dpi=100)
     x = np.arange(len(sub))
     display_labels = [
-        f"{r['model']}\n({'Open' if r['weights']=='Open' else 'Closed'})"
+        f"{r['canonical_name']}\n({'Open' if r['weights']=='Open' else 'Closed'})"
         for _, r in sub.iterrows()
     ]
     bar_colors = [_OPEN_COLOR if r["weights"] == "Open" else _CLOSED_COLOR for _, r in sub.iterrows()]
@@ -1088,23 +1116,29 @@ def plot_glm52_vs_opus5(
     for xi, val in zip(x, pr_vals):
         ax0.text(xi, val + 1.5, f"{val:.1f}%", ha="center", va="bottom", fontsize=14, fontweight="bold")
     ax0.set_xticks(x)
-    ax0.set_xticklabels(display_labels, fontsize=13, fontweight="bold")
+    ax0.set_xticklabels(display_labels, fontsize=12.5, fontweight="bold")
     ax0.set_ylabel("Executed Pass Rate (%)", fontsize=14, fontweight="bold")
     ax0.set_title("1. Task Pass Rate (%)", fontsize=16, fontweight="bold", pad=12)
-    ax0.set_ylim(0, 88)
+    ax0.set_ylim(0, 82)
     ax0.tick_params(axis="y", labelsize=12.5)
     ax0.grid(True, axis="y", linestyle=":", alpha=0.5)
 
     # Panel 2: Rebuilt Cache-Aware Cost per Run ($ USD)
     ax1 = axes[1]
-    cost_vals = np.array([swe_cost_map.get(str(m), 0.0) for m in sub["model"]], dtype=np.float64)
+    cost_vals = np.array(
+        [
+            float(r["total_cost_usd"]) / max(1, int(r["cost_runs"]))
+            for _, r in sub.iterrows()
+        ],
+        dtype=np.float64,
+    )
     ax1.bar(x, cost_vals, width=0.55, color=bar_colors, edgecolor="#111111", linewidth=1.3, alpha=0.9)
     for xi, (_, r) in enumerate(sub.iterrows()):
         val = float(cost_vals[xi])
         ld_sh = float(r["loop_dollar_share"]) * 100.0 if not np.isnan(float(r["loop_dollar_share"])) else 0.0
-        ax1.text(xi, val + 0.06, f"${val:.2f}/run\n({ld_sh:.1f}% $ in loops)", ha="center", va="bottom", fontsize=12.5, fontweight="bold")
+        ax1.text(xi, val + 0.06, f"${val:.2f}/run\n({ld_sh:.2f}% loop $)", ha="center", va="bottom", fontsize=12, fontweight="bold")
     ax1.set_xticks(x)
-    ax1.set_xticklabels(display_labels, fontsize=13, fontweight="bold")
+    ax1.set_xticklabels(display_labels, fontsize=12.5, fontweight="bold")
     ax1.set_ylabel("Mean Cache-Aware Cost per Run (USD)", fontsize=14, fontweight="bold")
     ax1.set_title("2. Cost per Run & Loop $ Share", fontsize=16, fontweight="bold", pad=12)
     ax1.set_ylim(0, max(1.0, float(np.max(cost_vals)) * 1.28))
@@ -1139,7 +1173,7 @@ def plot_glm52_vs_opus5(
         ax2.text(xi + w / 2, sv + 0.05, f"{sv:.2f}", ha="center", va="bottom", fontsize=12, fontweight="bold", color="#54278f")
 
     ax2.set_xticks(x)
-    ax2.set_xticklabels(display_labels, fontsize=13, fontweight="bold")
+    ax2.set_xticklabels(display_labels, fontsize=12.5, fontweight="bold")
     ax2.set_ylabel("Loops per 100 Executed Steps", fontsize=14, fontweight="bold")
     ax2.set_title("3. Loop Density (Default vs Strict)", fontsize=16, fontweight="bold", pad=12)
     ax2.set_ylim(0, max(1.0, float(np.max(def_hi)) * 1.28))
@@ -1156,9 +1190,9 @@ def plot_glm52_vs_opus5(
     fig.text(
         0.5,
         0.02,
-        "GLM-5.2 (Open) matches frontier pass rates on identical swelike tasks at a fraction of Opus-5 and Grok-4.5 per-run cost.",
+        "GLM-5.2 (Open, 62.9% pass, $1.19/run) matches frontier Closed pass rates (62.3%-63.8%) at less than half the per-run cost of Opus-5 ($2.81) and Grok-4.5 ($2.28).",
         ha="center",
-        fontsize=13,
+        fontsize=12.5,
         fontweight="bold",
         color="#222222",
     )
@@ -1194,7 +1228,7 @@ def plot_harness_dumbbell(
         "openhands": ("#9467bd", "P", "openhands (OpenHands Scaffold)"),
         "mini-swe-agent": ("#e377c2", "v", "mini-swe-agent (Minimal SWE Harness)"),
         "terminus-3-3": ("#8c564b", "X", "terminus-3-3 (Terminal Harness)"),
-        "deepagent-harbor": ("#7f7f7f", "<", "deepagent-harbor (Harbor Agent)"),
+        "judy": ("#7f7f7f", "<", "judy (Judy Agent Harness)"),
         "junie": ("#bcbd22", ">", "junie (JetBrains Junie)"),
         "swelike": ("#ff7f0e", "h", "swelike (SWE-rebench Common Scaffold)"),
     }
@@ -1230,12 +1264,12 @@ def plot_harness_dumbbell(
             )
 
         ax.text(
-            hi_v + 0.35,
+            hi_v + 0.40,
             yi,
             f"Spread: {spread:.2f}/100 ({lo_v:.2f} -> {hi_v:.2f})",
             va="center",
             ha="left",
-            fontsize=11.5,
+            fontsize=11.0,
             fontweight="bold",
             color="#222222",
         )
@@ -1247,7 +1281,7 @@ def plot_harness_dumbbell(
     ax.set_yticks(y_pos)
     ax.set_yticklabels(y_labels, fontsize=12, fontweight="bold")
     ax.set_xlabel("Loops per 100 Executed Steps (Shared Tasks Within Each Model)", fontsize=14, fontweight="bold")
-    ax.set_xlim(-0.5, float(harness_df["loops_per_100_steps"].max()) + 4.8)
+    ax.set_xlim(-0.5, float(harness_df["loops_per_100_steps"].max()) + 10.5)
     ax.tick_params(axis="x", labelsize=12.5)
     ax.grid(True, axis="x", linestyle=":", alpha=0.5)
 
@@ -1258,24 +1292,24 @@ def plot_harness_dumbbell(
             handles.append(
                 Line2D([0], [0], marker=marker, color="w", markerfacecolor=col, markeredgecolor="#111111", markersize=10, label=leg_lbl)
             )
-    ax.legend(handles=handles, loc="lower right", fontsize=11.5, frameon=True, facecolor="#f8f9fa", title="Agent Harness / Scaffold", title_fontsize=12.5)
+    ax.legend(handles=handles, loc="lower right", fontsize=11, frameon=True, facecolor="#f8f9fa", title="Agent Harness / Scaffold", title_fontsize=12)
 
     tb_subs = model_order[model_order["dataset"] == "terminalbench"]
     med_spread = float(tb_subs["spread_loops_per_100_steps"].median()) if not tb_subs.empty else 0.0
     max_spread = float(tb_subs["spread_loops_per_100_steps"].max()) if not tb_subs.empty else 0.0
     callout = (
         f"Same Weights, Different Harness (Terminal-Bench shared tasks):\n"
-        f"• Within-model harness spread median = {med_spread:.2f} loops/100 steps (max = {max_spread:.2f})\n"
-        f"• Comparable in scale to the capability-matched Open-vs-Closed gap (+4.20 on TB, +0.97 on SWE-rebench)"
+        f"• Within-model harness spread median = {med_spread:.2f} loops/100 (max = {max_spread:.2f})\n"
+        f"• Exceeds the skill-matched Open-vs-Closed gap (+4.20 on TB, +2.54 on SWE)"
     )
     ax.text(
-        0.36,
-        0.16,
+        0.48,
+        0.50,
         callout,
         transform=ax.transAxes,
-        fontsize=12,
+        fontsize=11.5,
         fontweight="bold",
-        bbox=dict(boxstyle="round,pad=0.55", facecolor="#fff8e7", edgecolor="#d95f02", linewidth=1.6),
+        bbox=dict(boxstyle="round,pad=0.5", facecolor="#fff8e7", edgecolor="#d95f02", linewidth=1.6),
     )
 
     fig.suptitle(
@@ -1284,8 +1318,9 @@ def plot_harness_dumbbell(
         fontweight="bold",
         y=0.96,
     )
-    fig.subplots_adjust(left=0.22, right=0.98, top=0.90, bottom=0.10)
+    fig.subplots_adjust(left=0.21, right=0.98, top=0.90, bottom=0.10)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=100)
     plt.close(fig)
+
 

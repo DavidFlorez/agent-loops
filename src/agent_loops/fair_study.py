@@ -1467,7 +1467,13 @@ def run_fair_open_vs_closed_study(
     sensitivities = compute_sensitivity_analyses(cohorts, model_df, other_bk)
 
     csv_path = results_dir / "loops_by_model_scaffold.csv"
-    model_df.to_csv(csv_path, index=False)
+    csv_export_df = model_df.copy()
+    for col in ("loop_dollar_share", "loop_dollar_share_ci_low", "loop_dollar_share_ci_high"):
+        if col in csv_export_df.columns:
+            csv_export_df[col] = csv_export_df[col].astype(object)
+            mask = (csv_export_df["cost_runs"] > 0) & (csv_export_df["cost_runs"] < 100)
+            csv_export_df.loc[mask, col] = "n<100"
+    csv_export_df.to_csv(csv_path, index=False)
 
     md_text = build_open_vs_closed_markdown(
         cohorts=cohorts,

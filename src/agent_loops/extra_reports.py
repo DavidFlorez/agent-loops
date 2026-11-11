@@ -170,7 +170,10 @@ def build_gemini_report(
             }
         )
     hm_df = pd.DataFrame(rows_hm).sort_values(["generation", "all_pass_rate"], ascending=[True, False])
-    hm_df.to_csv(results_dir / "gemini_by_harness_model.csv", index=False)
+    hm_csv = hm_df.copy()
+    hm_csv["loop_dollar_share"] = hm_csv["loop_dollar_share"].astype(object)
+    hm_csv.loc[(hm_csv["cost_runs"] > 0) & (hm_csv["cost_runs"] < 100), "loop_dollar_share"] = "n<100"
+    hm_csv.to_csv(results_dir / "gemini_by_harness_model.csv", index=False)
 
     # Generation summaries
     gen_groups: list[tuple[str, pd.DataFrame, list[CompactRunRecord]]] = [
@@ -362,7 +365,10 @@ def build_open_vs_closed_report(
         ("swe_rebench_agentic_systems", "closed_agentic", swe_closed_ag_agg),
     ]
     csv_rows = [{"slice": s, "cohort": c, **vals} for s, c, vals in summary_slices]
-    pd.DataFrame(csv_rows).to_csv(results_dir / "open_vs_closed_summary.csv", index=False)
+    ovc_csv = pd.DataFrame(csv_rows)
+    ovc_csv["loop_dollar_share"] = ovc_csv["loop_dollar_share"].astype(object)
+    ovc_csv.loc[(ovc_csv["cost_runs"] > 0) & (ovc_csv["cost_runs"] < 100), "loop_dollar_share"] = "n<100"
+    ovc_csv.to_csv(results_dir / "open_vs_closed_summary.csv", index=False)
 
     # Individual SWE-rebench participant rows keyed by harness (exact 17 participants)
     swe_parts = []
