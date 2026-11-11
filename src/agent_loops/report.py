@@ -269,7 +269,13 @@ def write_results_and_summary(
     md.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
     for _, r in tb_by_harness.sort_values("loop_run_rate", ascending=False).iterrows():
         h = r["harness"]
-        dsh = _fmt_pct(r["loop_dollar_share"]) if pd.notna(r["loop_dollar_share"]) else "n/a"
+        c_runs = int(r.get("cost_runs", 0))
+        if c_runs == 0 or pd.isna(r["loop_dollar_share"]):
+            dsh = "n/a"
+        elif c_runs < 100:
+            dsh = "n<100"
+        else:
+            dsh = _fmt_pct(r["loop_dollar_share"])
         lp_p = _fmt_pct(r["looping_pass_rate"]) if pd.notna(r["looping_pass_rate"]) else "n/a"
         fr_p = _fmt_pct(r["loop_free_pass_rate"]) if pd.notna(r["loop_free_pass_rate"]) else "n/a"
         md.append(
@@ -282,7 +288,13 @@ def write_results_and_summary(
     md.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
     for _, r in swe_by_harness.sort_values("loop_run_rate", ascending=False).iterrows():
         h = r["harness"]
-        dsh = _fmt_pct(r["loop_dollar_share"]) if pd.notna(r["loop_dollar_share"]) else "n/a"
+        c_runs = int(r.get("cost_runs", 0))
+        if c_runs == 0 or pd.isna(r["loop_dollar_share"]):
+            dsh = "n/a"
+        elif c_runs < 100:
+            dsh = "n<100"
+        else:
+            dsh = _fmt_pct(r["loop_dollar_share"])
         lp_p = _fmt_pct(r["looping_pass_rate"]) if pd.notna(r["looping_pass_rate"]) else "n/a"
         fr_p = _fmt_pct(r["loop_free_pass_rate"]) if pd.notna(r["loop_free_pass_rate"]) else "n/a"
         md.append(

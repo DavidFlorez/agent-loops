@@ -257,11 +257,12 @@ def build_gemini_report(
         hdf = gem_df[gem_df["agent"] == h]
         agg = _aggregate_compact(srecs)
         models_str = ", ".join(sorted({r.model.split("@")[0] for r in srecs}))
+        ld_s = "n/a" if agg["cost_runs"] == 0 else ("n<100" if agg["cost_runs"] < 100 else _fmt_pct(agg["loop_dollar_share"]))
         md.append(
             f"| `{h}` | {models_str} | {agg['runs']:,} | {_fmt_pct(agg['pass_rate'])} | "
             f"{_fmt_pct(float(hdf['passed'].mean()))} ({len(hdf):,}) | "
             f"{agg['loop_runs']:,} ({_fmt_pct(agg['loop_run_rate'])}) | {_fmt_pct(agg['loop_step_share'])} | "
-            f"{agg['cost_runs']:,} | {_fmt_pct(agg['loop_dollar_share'])} | "
+            f"{agg['cost_runs']:,} | {ld_s} | "
             f"{agg['det_gemini_cli']:,} | {agg['det_openclaw_10']:,} |"
         )
     md.append("")
@@ -272,7 +273,8 @@ def build_gemini_report(
     for _, r in hm_df.iterrows():
         lr_s = f"{int(r['loop_runs'])} ({_fmt_pct(r['loop_run_rate'])})" if pd.notna(r["loop_run_rate"]) else "n/a (no steps)"
         ls_s = _fmt_pct(r["loop_step_share"]) if pd.notna(r["loop_step_share"]) else "n/a"
-        ld_s = _fmt_pct(r["loop_dollar_share"]) if pd.notna(r["loop_dollar_share"]) else "n/a"
+        c_runs = int(r.get("cost_runs", 0))
+        ld_s = "n/a" if (c_runs == 0 or pd.isna(r["loop_dollar_share"])) else ("n<100" if c_runs < 100 else _fmt_pct(r["loop_dollar_share"]))
         md.append(
             f"| `{r['harness']}` | `{r['model']}` | {int(r['total_trials']):,} | {_fmt_pct(r['all_pass_rate'])} | "
             f"{r['mean_duration_s']:.1f} | {int(r['step_runs']):,} | {lr_s} | {ls_s} | {ld_s} |"
@@ -429,18 +431,20 @@ def build_open_vs_closed_report(
         if agg is None:
             md.append(f"| {label} | {n_runs:,} | {_fmt_pct(pr)} | n/a | n/a | n/a | n/a | n/a | n/a |")
         else:
+            ld_s = "n/a" if agg["cost_runs"] == 0 else ("n<100" if agg["cost_runs"] < 100 else _fmt_pct(agg["loop_dollar_share"]))
             md.append(
                 f"| {label} | {n_runs:,} | {_fmt_pct(pr)} | "
                 f"{agg['loop_runs']:,} ({_fmt_pct(agg['loop_run_rate'])}) | {_fmt_pct(agg['loop_step_share'])} | "
                 f"{agg['mean_steps']:.1f} / {agg['p90_steps']:.0f} | {agg['cost_runs']:,} | "
-                f"{_fmt_usd(agg['cost_per_run_usd'])} | {_fmt_pct(agg['loop_dollar_share'])} |"
+                f"{_fmt_usd(agg['cost_per_run_usd'])} | {ld_s} |"
             )
     md.append("")
     md.append(
         f"> **Methodological note on Terminal-Bench Closed cost share (`{_fmt_pct(tb_closed_agg['loop_dollar_share'])}`)**: "
         f"Only `{tb_closed_agg['cost_runs']:,} / {tb_closed_agg['runs']:,}` Closed TB runs survived the `[0.50x, 2.00x]` "
         "cost-rebuild validation (newer Gemini-3, GPT-5.2, and RSC-pointer runs had `cost_cents=0` or missing tokens), "
-        "leaving an older subset dominated by `claude-opus-4-1` and `gemini-2.5-flash`. On SWE-rebench (`swelike` controlled), where both "
+        "leaving an older subset dominated by `claude-opus-4-1` and `gemini-2.5-flash`. Cells with `<100` cost-valid runs "
+        "are suppressed as `n<100`. On SWE-rebench (`swelike` controlled), where both "
         f"cohorts have high cost coverage (`{swe_open_agg['cost_runs']:,}` Open vs `{swe_closed_swe_agg['cost_runs']:,}` Closed), "
         f"Open models spend **{_fmt_pct(swe_open_agg['loop_dollar_share'])}** of dollars on loops vs **{_fmt_pct(swe_closed_swe_agg['loop_dollar_share'])}** for Closed.\n"
     )
@@ -452,10 +456,11 @@ def build_open_vs_closed_report(
     for h in ("terminus-2", "openhands", "mini-swe-agent"):
         op, cl = _tb_harness_open_closed_rows(tb_records, h)
         for cname, agg in (("Open-Weights", op), ("Closed", cl)):
+            ld_s = "n/a" if agg["cost_runs"] == 0 else ("n<100" if agg["cost_runs"] < 100 else _fmt_pct(agg["loop_dollar_share"]))
             md.append(
                 f"| `{h}` | {cname} | {agg['runs']:,} | {_fmt_pct(agg['pass_rate'])} | "
                 f"{agg['loop_runs']:,} ({_fmt_pct(agg['loop_run_rate'])}) | {_fmt_pct(agg['loop_step_share'])} | "
-                f"{agg['mean_steps']:.1f} / {agg['median_steps']:.0f} | {agg['cost_runs']:,} | {_fmt_pct(agg['loop_dollar_share'])} |"
+                f"{agg['mean_steps']:.1f} / {agg['median_steps']:.0f} | {agg['cost_runs']:,} | {ld_s} |"
             )
     md.append("")
 
@@ -501,10 +506,12 @@ def build_open_vs_closed_report(
     md.append("| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
     for _, r in swe_parts_df.iterrows():
         rot_cnt = int(round(r["rotation_rate"] * r["runs"]))
+        c_runs = int(r.get("cost_runs", 0))
+        ld_s = "n/a" if c_runs == 0 else ("n<100" if c_runs < 100 else _fmt_pct(r["loop_dollar_share"]))
         md.append(
             f"| `{r['participant']}` | `{r['model']}` | {r['weights']} | `{r['scaffold']}` | "
             f"{_fmt_pct(r['pass_rate'])} | {_fmt_pct(r['loop_run_rate'])} | {_fmt_pct(r['loop_step_share'])} | "
-            f"{_fmt_usd(r['cost_per_run_usd'])} | {_fmt_pct(r['loop_dollar_share'])} | {rot_cnt} |"
+            f"{_fmt_usd(r['cost_per_run_usd'])} | {ld_s} | {rot_cnt} |"
         )
     md.append("")
 

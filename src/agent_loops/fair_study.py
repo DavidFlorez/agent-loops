@@ -1097,6 +1097,7 @@ def compute_sensitivity_analyses(
                     "models": int(len(grp)),
                     "model_list": ", ".join(grp["canonical_name"].tolist()),
                     "executed_runs": int(grp["executed_runs"].sum()),
+                    "cost_runs": int(grp["cost_runs"].sum()),
                     "mean_pass_rate": float(grp["executed_pass_rate"].mean()),
                     "mean_loops_per_100": float(grp["loops_per_100_steps"].mean()),
                     "mean_any_loop_rate": float(grp["any_loop_rate"].mean()),
@@ -1360,11 +1361,13 @@ def build_open_vs_closed_markdown(
     md.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
     fam_df: pd.DataFrame = sensitivities["per_family_df"]
     for _, r in fam_df.sort_values(["cohort", "mean_loops_per_100"], ascending=[True, False]).iterrows():
+        c_runs = int(r.get("cost_runs", 0))
+        lds_s = "n/a" if (c_runs == 0 or pd.isna(r["mean_loop_dollar_share"])) else ("n<100" if c_runs < 100 else _fmt_pct(r["mean_loop_dollar_share"]))
         md.append(
             f"| `{r['cohort']}` | `{r['family_group']}` | {r['weights']} | {int(r['models'])} | "
             f"{int(r['executed_runs']):,} | {_fmt_pct(r['mean_pass_rate'])} | "
             f"{_fmt_num(r['mean_loops_per_100'])} | {_fmt_pct(r['mean_any_loop_rate'])} | "
-            f"{_fmt_pct(r['mean_loop_dollar_share'])} |"
+            f"{lds_s} |"
         )
     md.append("")
 
@@ -1374,11 +1377,13 @@ def build_open_vs_closed_markdown(
         md.append("| Cohort / Scaffold | Model | Pass Rate | Loops/100 [95% CI] | Any-Loop Rate [95% CI] | Loop $ Share |")
         md.append("| --- | --- | ---: | ---: | ---: | ---: |")
         for _, r in gem_rows.sort_values(["cohort", "model"]).iterrows():
+            c_runs = int(r.get("cost_runs", 0))
+            lds_s = "n/a" if (c_runs == 0 or pd.isna(r["loop_dollar_share"])) else ("n<100" if c_runs < 100 else _fmt_pct(r["loop_dollar_share"]))
             md.append(
                 f"| `{r['cohort']}` | `{r['model']}` | {_fmt_pct(r['executed_pass_rate'])} | "
                 f"{_fmt_num(r['loops_per_100_steps'])} [{_fmt_num(r['loops_per_100_steps_ci_low'])}, {_fmt_num(r['loops_per_100_steps_ci_high'])}] | "
                 f"{_fmt_pct(r['any_loop_rate'])} [{_fmt_pct(r['any_loop_rate_ci_low'])}, {_fmt_pct(r['any_loop_rate_ci_high'])}] | "
-                f"{_fmt_pct(r['loop_dollar_share'])} |"
+                f"{lds_s} |"
             )
     obk_df: pd.DataFrame = sensitivities["non_alltools_bk_df"]
     gem_bk = obk_df[obk_df["family"] == "gemini"] if not obk_df.empty else pd.DataFrame()
@@ -1391,16 +1396,24 @@ def build_open_vs_closed_markdown(
     md.append("")
 
     md.append("## 5. Open vs Closed Dollar Share & Longtail Context Confounders\n")
-    md.append("| Cohort | Open Mean Loop $ Share (Cost-Valid) | Closed Mean Loop $ Share (Cost-Valid) | Cost Provenance Note |")
-    md.append("| --- | ---: | ---: | --- |")
+    md.append(
+        "*Cells with fewer than 100 cost-validated runs are suppressed as `n<100` (e.g., `tb_openhands` Closed has only 47 cost-valid runs; "
+        "Terminal-Bench Closed has only 800 cost-validated runs across all harnesses combined).*\n"
+    )
+    md.append("| Cohort | Open Cost-Valid Runs | Open Mean Loop $ Share | Closed Cost-Valid Runs | Closed Mean Loop $ Share | Cost Provenance Note |")
+    md.append("| --- | ---: | ---: | ---: | ---: | --- |")
     for cname in COHORT_ORDER:
         if cname not in matching:
             continue
         sub = model_df[(model_df["cohort"] == cname) & (model_df["cost_runs"] > 0)]
-        o_lds = sub[sub["weights"] == "Open"]["loop_dollar_share"].mean() if not sub[sub["weights"] == "Open"].empty else float("nan")
-        c_lds = sub[sub["weights"] == "Closed"]["loop_dollar_share"].mean() if not sub[sub["weights"] == "Closed"].empty else float("nan")
+        o_sub = sub[sub["weights"] == "Open"]
+        c_sub = sub[sub["weights"] == "Closed"]
+        o_cruns = int(o_sub["cost_runs"].sum()) if not o_sub.empty else 0
+        c_cruns = int(c_sub["cost_runs"].sum()) if not c_sub.empty else 0
+        o_lds = "n/a" if o_cruns == 0 else ("n<100" if o_cruns < 100 else _fmt_pct(float(o_sub["loop_dollar_share"].mean())))
+        c_lds = "n/a" if c_cruns == 0 else ("n<100" if c_cruns < 100 else _fmt_pct(float(c_sub["loop_dollar_share"].mean())))
         provs = ", ".join(sorted(sub["cost_source"].unique())) if not sub.empty else "none"
-        md.append(f"| `{cname}` | {_fmt_pct(o_lds)} | {_fmt_pct(c_lds)} | `{provs}` |")
+        md.append(f"| `{cname}` | {o_cruns:,} | {o_lds} | {c_cruns:,} | {c_lds} | `{provs}` |")
     md.append("")
 
     lt_df: pd.DataFrame = sensitivities["longtail_models_df"]
@@ -1409,10 +1422,12 @@ def build_open_vs_closed_markdown(
         md.append("| Model | Weights | Context Limit | Exec Runs (Zero-Step Drops) | Exec Pass | Loops/100 | Any-Loop Rate | Loop $ Share |")
         md.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
         for _, r in lt_df.sort_values("executed_pass_rate", ascending=False).iterrows():
+            c_runs = int(r.get("cost_runs", 0))
+            lds_s = "n/a" if c_runs == 0 else ("n<100" if c_runs < 100 else _fmt_pct(r["loop_dollar_share"]))
             md.append(
                 f"| `{r['model']}` | {r['weights']} | `{r['context_limit_tokens_set']}` | "
                 f"{int(r['executed_runs'])} ({int(r['zero_step_runs'])}) | {_fmt_pct(r['executed_pass_rate'])} | "
-                f"{_fmt_num(r['loops_per_100_steps'])} | {_fmt_pct(r['any_loop_rate'])} | {_fmt_pct(r['loop_dollar_share'])} |"
+                f"{_fmt_num(r['loops_per_100_steps'])} | {_fmt_pct(r['any_loop_rate'])} | {lds_s} |"
             )
         md.append("")
 

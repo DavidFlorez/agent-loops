@@ -41,7 +41,13 @@ from agent_loops.detectors import (
     make_turn_budget_detector,
     run_matched_random_baseline,
 )
-from agent_loops.labeler import ALL_STEP_LABELS, PATHOLOGICAL_LOOP_LABELS, label_trajectory
+from agent_loops.labeler import (
+    ALL_STEP_LABELS,
+    PATHOLOGICAL_LOOP_LABELS,
+    classify_readonly_command,
+    label_trajectory,
+    label_trajectory_strict,
+)
 
 STEP_CAP_VALUES = (30, 50, 75, 100, 150)
 
@@ -95,6 +101,17 @@ class CompactRunRecord:
     litellm_llm: str | None = None
     cohort: str | None = None
     retrieval_config: str | None = None
+    has_strict_loop: bool = False
+    strict_loop_steps: int = 0
+    strict_label_counts: dict[str, int] | None = None
+    exact_loop_steps_total: int = 0
+    exact_loop_steps_readonly: int = 0
+    readonly_exact_by_cat: dict[str, int] | None = None
+    raw_estimated_cost_usd: float = 0.0
+    reported_cost_usd_raw: float | None = None
+    reported_input_tokens: float | None = None
+    reported_output_tokens: float | None = None
+    reported_cache_tokens: float | None = None
 
 
 def _is_finite_pos(val: Any) -> bool:
@@ -144,12 +161,14 @@ def _analyze_single_trajectory(
     step_costs_override: list[float] | None = None,
 ) -> CompactRunRecord:
     step_labels = label_trajectory(steps)
+    strict_labels = label_trajectory_strict(steps)
     if step_costs_override is not None and compaction_reason is None and len(step_costs_override) == len(steps) and steps:
         cost_included = True
         drop_reason = None
         mismatch_ratio = 1.0
         step_costs_list = list(step_costs_override)
         total_cost_usd = float(sum(step_costs_list))
+        raw_est_usd = total_cost_usd
     else:
         cost_res = rebuild_trajectory_costs(
             steps,
@@ -168,21 +187,43 @@ def _analyze_single_trajectory(
         mismatch_ratio = cost_res.mismatch_ratio
         step_costs_list = cost_res.step_costs_usd
         total_cost_usd = cost_res.total_cost_usd
+        raw_est_usd = cost_res.raw_cost_usd
 
     label_counts: dict[str, int] = {k: 0 for k in ALL_STEP_LABELS}
     all_tags: set[str] = set()
     loop_steps = 0
     prod_steps = 0
     loop_cost = 0.0
+    exact_total = 0
+    exact_readonly = 0
+    ro_cats: dict[str, int] = {
+        "read_or_search_tool": 0,
+        "shell_inspect": 0,
+        "git_readonly": 0,
+        "pytest_or_test_runner": 0,
+    }
     for idx, sl in enumerate(step_labels):
         label_counts[sl.primary_label] = label_counts.get(sl.primary_label, 0) + 1
         all_tags.update(sl.labels)
+        if "exact_loop" in sl.labels:
+            exact_total += 1
+            rcat = classify_readonly_command(steps[idx])
+            if rcat is not None:
+                exact_readonly += 1
+                ro_cats[rcat] = ro_cats.get(rcat, 0) + 1
         if sl.is_loop:
             loop_steps += 1
             if cost_included:
                 loop_cost += step_costs_list[idx]
         elif "productive_repeat" in sl.labels:
             prod_steps += 1
+
+    strict_counts: dict[str, int] = {"exact_loop": 0, "aba_thrash": 0, "period_k_rotation": 0}
+    strict_loop_steps = 0
+    for sl_s in strict_labels:
+        if sl_s.is_loop:
+            strict_loop_steps += 1
+            strict_counts[sl_s.primary_label] = strict_counts.get(sl_s.primary_label, 0) + 1
 
     has_any_loop = loop_steps > 0
     replay_obj = ReplayTrajectory(
@@ -238,6 +279,17 @@ def _analyze_single_trajectory(
         litellm_llm=litellm_llm,
         cohort=cohort,
         retrieval_config=retrieval_config,
+        has_strict_loop=(strict_loop_steps > 0),
+        strict_loop_steps=strict_loop_steps,
+        strict_label_counts=strict_counts,
+        exact_loop_steps_total=exact_total,
+        exact_loop_steps_readonly=exact_readonly,
+        readonly_exact_by_cat=ro_cats,
+        raw_estimated_cost_usd=raw_est_usd,
+        reported_cost_usd_raw=reported_cost_usd,
+        reported_input_tokens=reported_total_in if reported_total_in is not None else reported_uncached_in,
+        reported_output_tokens=reported_out,
+        reported_cache_tokens=reported_cached_in,
     )
 
 
@@ -387,6 +439,11 @@ def _process_tb_batch(rows: list[dict[str, Any]]) -> tuple[list[CompactRunRecord
             cost_source="reported_usd_rebuilt",
             cohort=f"tb_{agent.replace('-', '_')}",
         )
+        in_tok = row.get("input_tokens")
+        out_tok = row.get("output_tokens")
+        rec.reported_input_tokens = float(in_tok) if _is_finite_nonneg(in_tok) else None
+        rec.reported_output_tokens = float(out_tok) if _is_finite_nonneg(out_tok) else None
+        rec.reported_cache_tokens = float(cache_val) if _is_finite_nonneg(cache_val) else None
         records.append(rec)
         counts["rows_with_steps"] += 1
         if rec.cost_included:
